@@ -68,7 +68,7 @@ EXAMPLES_SRC := $(call rwildcard, $(EXAMPLES_DIR), *.c)
 # CFLAGS, LDFLAGS, ETC
 #
 
-INCLUDE = -I $(INCDIR) -I $(SRCDIR) -I $(SRCDIR)/platform_$(PLATFORM) -I $(TESTS_DIR)
+INCLUDE = -I $(INCDIR) -I $(SRCDIR) -I $(SRCDIR)/platform_$(PLATFORM) -I $(TESTS_DIR) -I $(INCDIR)/Memento_Filter/include
 
 # use += here, so that extra flags can be provided via the environment
 

@@ -13,6 +13,8 @@
 #include "btree.h"
 #include "memtable.h"
 #include "routing_filter.h"
+#include "memento.h"
+#include "memento_int.h"
 #include "shard_log.h"
 #include "merge.h"
 #include "task.h"
