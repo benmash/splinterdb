@@ -4119,7 +4119,7 @@ trunk_build_filters(trunk_handle             *spl,
       if (!filter_scratch->should_build[pos]) {
          continue;
       }
-      routing_filter old_filter = filter_scratch->old_filter[pos];
+      routing_filter old_filter = filter_scratch->old_filter[pos]; // TODO: change type?
       uint32         fp_start, fp_end;
       uint64         generation = compact_req->pivot_generation[pos];
       trunk_process_generation_to_fp_bounds(
@@ -4133,6 +4133,7 @@ trunk_build_filters(trunk_handle             *spl,
          filter_scratch->filter[pos] = old_filter;
          continue;
       }
+      //TODO: important, create filter here
       routing_filter  new_filter;
       routing_config *filter_cfg = &spl->cfg.filter_cfg;
       uint16          value      = filter_scratch->value[pos];
