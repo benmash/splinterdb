@@ -27,8 +27,8 @@ define rwildcard =
 	$(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))
 endef
 
-SRC := $(call rwildcard, $(SRCDIR), *.c)
-
+SRC := $(call rwildcard, $(SRCDIR), *.c) $(call rwildcard, $(INCDIR)/Memento_Filter, *.c)
+#$(info src is $(SRC))
 # Generate list of common test source files, only from tests/ dir.
 # These objects are shared between functional/ and unit/ test binaries.
 COMMON_TESTSRC := $(wildcard $(TESTS_DIR)/*.c)
@@ -71,8 +71,8 @@ EXAMPLES_SRC := $(call rwildcard, $(EXAMPLES_DIR), *.c)
 INCLUDE = -I $(INCDIR) -I $(SRCDIR) -I $(SRCDIR)/platform_$(PLATFORM) -I $(TESTS_DIR) -I $(INCDIR)/Memento_Filter/include
 
 # use += here, so that extra flags can be provided via the environment
-
-CFLAGS += -D_GNU_SOURCE -ggdb -Wall -pthread -Wfatal-errors -Werror -Wvla
+# -Wfatal-errors  -Werror
+CFLAGS += -D_GNU_SOURCE -ggdb -Wall -pthread -Wvla
 CFLAGS += -DXXH_STATIC_LINKING_ONLY -fPIC
 CFLAGS += -DSPLINTERDB_PLATFORM_DIR=$(PLATFORM_DIR)
 

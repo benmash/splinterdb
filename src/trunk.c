@@ -9726,6 +9726,8 @@ trunk_config_init(trunk_config        *trunk_cfg,
       * cache_config_extent_size(cache_cfg) / MEMTABLE_SPACE_OVERHEAD_FACTOR;
    trunk_cfg->target_leaf_kv_bytes = trunk_cfg->max_kv_bytes_per_node / 2;
    trunk_cfg->max_tuples_per_node  = trunk_cfg->max_kv_bytes_per_node / 32;
+   platform_error_log("\nmax_tuples_per_node: %lu\n", trunk_cfg->max_tuples_per_node);
+   platform_error_log("\nmemtable capacity: %lu\n", memtable_capacity);
 
    // filter config settings
    filter_cfg->cache_cfg = cache_cfg;
