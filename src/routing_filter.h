@@ -46,12 +46,14 @@
   * Stored in trunk nodes, and is a pointer to a routing filter.
   * -----------------------------------------------------------------------------
   */
+ /**/
  typedef struct ONDISK routing_filter {
     uint64 addr;
     uint64 meta_head;
     uint32 num_fingerprints;
     uint32 num_unique;
     uint32 value_size;
+    QF qf;
  } routing_filter;
  
  struct routing_async_ctxt;
@@ -90,11 +92,11 @@
  } routing_async_ctxt;
  
  // 
- typedef struct ONDISK routing_filter_memento {
-   uint64 addr; // page idx, on disk
-   uint64 meta_head; // extend idx, on disk
-   QF qf; // QF struct, has mem pointers to cache
-} routing_filter_memento;
+//  typedef struct ONDISK routing_filter_memento {
+//    uint64 addr; // page idx, on disk
+//    uint64 meta_head; // extend idx, on disk
+//    QF qf; // QF struct, has mem pointers to cache
+// } routing_filter;
 
 
  platform_status

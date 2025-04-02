@@ -326,13 +326,13 @@ routing_get_bucket_counts(routing_config *cfg, routing_hdr *hdr, uint32 *count)
  *----------------------------------------------------------------------
  */
 platform_status
-routing_filter_add(cache          *cc,
-                   routing_config *cfg,
+routing_filter_add(cache                  *cc,
+                   routing_config         *cfg,
                    routing_filter *old_filter,
                    routing_filter *filter,
-                   uint32         *new_fp_arr,
-                   uint64          num_new_fp,
-                   uint16          value)
+                   uint32                 *new_fp_arr,
+                   uint64                  num_new_fp,
+                   uint16                  value)
 {
    ZERO_CONTENTS(filter);
 
@@ -428,10 +428,10 @@ routing_filter_add(cache          *cc,
    // memset(encoding_buffer, 0xff, ROUTING_FPS_PER_PAGE / 32 * sizeof(uint32));
 
    
-   // memento filter initialization will break and return the size needed for creation
-   uint64_t n_bytes = qf_init(NULL, 262144, 18, 5, QF_HASH_DEFAULT, 0xBEEF, NULL, 0);
-   platform_error_log("memento bytes requested: %lu\n", n_bytes);
-   platform_error_log("page size: %lu, extent size: %lu\n", page_size, extent_size);
+   // // memento filter initialization will break and return the size needed for creation
+   // uint64_t n_bytes = qf_init(NULL, 262144, 18, 5, QF_HASH_DEFAULT, 0xBEEF, NULL, 0);
+   // platform_error_log("memento bytes requested: %lu\n", n_bytes);
+   // platform_error_log("page size: %lu, extent size: %lu\n", page_size, extent_size);
    
    // we use a mini_allocator to obtain pages
    allocator      *al = cache_get_allocator(cc);
@@ -445,19 +445,37 @@ routing_filter_add(cache          *cc,
 
    // set up the index pages
    // uint64       addrs_per_page = page_size / sizeof(uint64);
-   page_handle *index_page[MAX_PAGES_PER_EXTENT];
-   uint64       index_addr = mini_alloc(&mini, 0, NULL_KEY, NULL);  // get a page from the extent
-   platform_assert(index_addr % extent_size == 0);
-   index_page[0] = cache_alloc(cc, index_addr, PAGE_TYPE_FILTER); // get a pointer to the page in memory
-   for (uint64 i = 1; i < pages_per_extent; i++) {
+   // page_handle *index_page[MAX_PAGES_PER_EXTENT];
+   // uint64       index_addr = mini_alloc(&mini, 0, NULL_KEY, NULL);  // get a page from the extent
+   // platform_assert(index_addr % extent_size == 0);
+   // index_page[0] = cache_alloc(cc, index_addr, PAGE_TYPE_FILTER); // get a pointer to the page in memory
+   
+   #define N_PAGES 256 + 1
+
+   page_handle *pages[N_PAGES];
+
+   for (uint64 i = 0; i < N_PAGES; i++) {
       uint64 next_index_addr = mini_alloc(&mini, 0, NULL_KEY, NULL);
-      platform_assert(next_index_addr == index_addr + i * page_size);
-      index_page[i] = cache_alloc(cc, next_index_addr, PAGE_TYPE_FILTER);
+      // platform_assert(next_index_addr == index_addr + i * page_size);
+      // platform_error_log("page addr: %lu\n", next_index_addr);
+      pages[i] = cache_alloc(cc, next_index_addr, PAGE_TYPE_FILTER);
       // platform_assert(index_page[i] == index_page[0] + i * page_size); //TODO FAILSLSLS; non-contiguous pages in cache
    }
-   filter->addr = index_addr;
+   // filter->addr = index_addr;
 
-   platform_error_log("filter->addr: %lu\n", filter->addr);
+   qf_init_pages(&filter->qf, 1024 * (N_PAGES - 1), 38, 9, QF_HASH_NONE, 0xBEEF, pages, N_PAGES);
+
+   platform_error_log("after init\n");
+
+   for (uint64_t i = 0; i < num_new_fp; i++){
+      // insert singles rather than sort + batch insert
+      platform_error_log("a-\n");
+      qf_insert_single(&filter->qf, new_fp_arr[i], new_fp_arr[i], QF_NO_LOCK | QF_KEY_IS_HASH);
+   }
+   
+   platform_error_log("after insert_single loop\n");
+
+   // platform_error_log("filter->addr: %lu\n", filter->addr);
 
    // above ^ : we need to copy this functionality
    
@@ -657,8 +675,8 @@ routing_filter_add(cache          *cc,
    //IMPORTANT: probably still need this V
    // routing_unlock_and_unget_page(cc, filter_page);
 
-   for (uint64 i = 0; i < pages_per_extent; i++) {
-      routing_unlock_and_unget_page(cc, index_page[i]);
+   for (uint64 i = 0; i < N_PAGES; i++) {
+      routing_unlock_and_unget_page(cc, pages[i]);
    }
 
    mini_release(&mini, NULL_KEY);
