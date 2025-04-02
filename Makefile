@@ -27,7 +27,7 @@ define rwildcard =
 	$(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))
 endef
 
-SRC := $(call rwildcard, $(SRCDIR), *.c) $(call rwildcard, $(INCDIR)/Memento_Filter, *.c)
+SRC := $(call rwildcard, $(SRCDIR), *.c) $(call rwildcard, $(INCDIR)/memento, *.c)
 #$(info src is $(SRC))
 # Generate list of common test source files, only from tests/ dir.
 # These objects are shared between functional/ and unit/ test binaries.
@@ -68,7 +68,7 @@ EXAMPLES_SRC := $(call rwildcard, $(EXAMPLES_DIR), *.c)
 # CFLAGS, LDFLAGS, ETC
 #
 
-INCLUDE = -I $(INCDIR) -I $(SRCDIR) -I $(SRCDIR)/platform_$(PLATFORM) -I $(TESTS_DIR) -I $(INCDIR)/Memento_Filter/include
+INCLUDE = -I $(INCDIR) -I $(SRCDIR) -I $(SRCDIR)/platform_$(PLATFORM) -I $(TESTS_DIR) -I $(INCDIR)/memento
 
 # use += here, so that extra flags can be provided via the environment
 # -Wfatal-errors  -Werror
