@@ -597,7 +597,10 @@ static inline uint64_t bitselectv(const uint64_t val, int ignore, int rank)
 #if QF_BITS_PER_SLOT > 0
 static inline qfblock *get_block(const QF *qf, uint64_t block_index)
 {
-	return (qfblock *) &qf->pages[block_index]->data;
+    uint64_t page_index = block_index / 16;
+    uint64_t block_offset = block_index % 16;
+	return ((qfblock *) qf->pages[page_index]->data) + block_offset;
+    // return ((qfblock *) &qf->pages[page_index]->data) + block_offset;
 }
 #else // should not happen
 static inline qfblock *get_block(const QF *qf, uint64_t block_index)
@@ -642,6 +645,7 @@ static inline uint64_t get_slot(const QF *qf, uint64_t index)
 {
 	/* Should use __uint128_t to support up to 64-bit remainders, but gcc seems
 	 * to generate buggy code.  :/  */
+    printf("{ index : %lu , xnslots : %lu }", index, qf->metadata->xnslots);
 	assert(index < qf->metadata->xnslots);
     uint64_t *p = (uint64_t *)&get_block(qf, index /
             QF_SLOTS_PER_BLOCK)->slots[(index %
@@ -735,43 +739,56 @@ static inline uint64_t block_offset(const QF *qf, uint64_t blockidx)
 
 static inline uint64_t run_end(const QF *qf, uint64_t hash_bucket_index)
 {
+    printf("run_end start\n");
 	uint64_t bucket_block_index = hash_bucket_index / QF_SLOTS_PER_BLOCK;
 	uint64_t bucket_intrablock_offset = hash_bucket_index % QF_SLOTS_PER_BLOCK;
 	uint64_t bucket_blocks_offset = block_offset(qf, bucket_block_index);
 
+    printf("blk_idx: %lu, intra ifx: %lu, offset: %lu\n", bucket_block_index, bucket_intrablock_offset, bucket_blocks_offset);
+
     uint64_t bucket_intrablock_rank = bitrank(get_block(qf, bucket_block_index)->occupieds[0],
                                                 bucket_intrablock_offset);
-
-	if (bucket_intrablock_rank == 0) {
-		if (bucket_blocks_offset <= bucket_intrablock_offset)
-			return hash_bucket_index;
-		else
-			return QF_SLOTS_PER_BLOCK * bucket_block_index + bucket_blocks_offset - 1;
+    printf("pre if\n");
+    printf("bucket_intrablock_rank: %lu\n", bucket_intrablock_rank);
+    if (bucket_intrablock_rank == 0) {
+       if (bucket_blocks_offset <= bucket_intrablock_offset)
+          return hash_bucket_index;
+       else
+          return QF_SLOTS_PER_BLOCK * bucket_block_index + bucket_blocks_offset
+                 - 1;
 	}
+    printf("post if\n");
 
 	uint64_t runend_block_index  = bucket_block_index + bucket_blocks_offset /
                                                             QF_SLOTS_PER_BLOCK;
 	uint64_t runend_ignore_bits  = bucket_blocks_offset % QF_SLOTS_PER_BLOCK;
 	uint64_t runend_rank         = bucket_intrablock_rank - 1;
+    printf("runend_blkidx: %lu, ignore: %lu, rank: %lu\n", runend_block_index, runend_ignore_bits, runend_rank);
+    printf("runend block: %p\n", get_block(qf, runend_block_index));
+    printf("runends: %lu\n", get_block(qf, runend_block_index)->runends[0]);
     uint64_t runend_block_offset = bitselectv(get_block(qf, runend_block_index)->runends[0],
                                                         runend_ignore_bits, runend_rank);
-	if (runend_block_offset == QF_SLOTS_PER_BLOCK) {
-        if (bucket_blocks_offset == 0 && bucket_intrablock_rank == 0) {
-            /* The block begins in empty space, and this bucket is in that region of
-             * empty space */
-            return hash_bucket_index;
-        } else {
-            do {
-                runend_rank -= popcntv(get_block(qf, runend_block_index)->runends[0],
-                                        runend_ignore_bits);
-                runend_block_index++;
-                runend_ignore_bits  = 0;
-                runend_block_offset = bitselectv(get_block(qf, runend_block_index)->runends[0],
-                                                runend_ignore_bits, runend_rank);
-            } while (runend_block_offset == QF_SLOTS_PER_BLOCK);
-        }
+    printf("pre if 2\n");
+    if (runend_block_offset == QF_SLOTS_PER_BLOCK) {
+       if (bucket_blocks_offset == 0 && bucket_intrablock_rank == 0) {
+          /* The block begins in empty space, and this bucket is in that region
+           * of empty space */
+          return hash_bucket_index;
+       } else {
+          do {
+             runend_rank -=
+                popcntv(get_block(qf, runend_block_index)->runends[0],
+                        runend_ignore_bits);
+             runend_block_index++;
+             runend_ignore_bits = 0;
+             runend_block_offset =
+                bitselectv(get_block(qf, runend_block_index)->runends[0],
+                           runend_ignore_bits,
+                           runend_rank);
+          } while (runend_block_offset == QF_SLOTS_PER_BLOCK);
+       }
     }
-
+    printf("post if 2\n");
     uint64_t runend_index = QF_SLOTS_PER_BLOCK * runend_block_index +
         runend_block_offset;
     if (runend_index < hash_bucket_index)
@@ -783,9 +800,11 @@ static inline uint64_t run_end(const QF *qf, uint64_t hash_bucket_index)
 static inline int offset_lower_bound(const QF *qf, uint64_t slot_index)
 {
 	const qfblock *b = get_block(qf, slot_index / QF_SLOTS_PER_BLOCK);
+    printf("slot index: %lu, b: %p\n", slot_index, b);
 	const uint64_t slot_offset = slot_index % QF_SLOTS_PER_BLOCK;
 	const uint64_t boffset = b->offset;
 	const uint64_t occupieds = b->occupieds[0] & BITMASK(slot_offset+1);
+    printf("{ slot_offset, boffset, occupieds } = { %lu, %lu, %lu }\n", slot_offset, boffset, occupieds);
 	assert(QF_SLOTS_PER_BLOCK == 64);
 	if (boffset <= slot_offset) {
 		const uint64_t runends = (b->runends[0] & BITMASK(slot_offset)) >> boffset;
@@ -812,10 +831,20 @@ static inline int probably_is_empty(const QF *qf, uint64_t slot_index)
 		&& !is_runend(qf, slot_index);
 }
 
+/*runend_blkidx: 646, ignore: 2, rank: 0
+runend block: 0x71539674b5dc
+runends: 196608
+pre if 2
+post if 2
+before is_occupied if
+slot index: 41376, b: 0x71539674b5dc
+{ slot_offset, boffset, occupieds } = { 32, 2, 65536 }
+first empty slot t: -1, from: 41376*/
 static inline uint64_t find_first_empty_slot(QF *qf, uint64_t from)
 {
 	do {
 		int t = offset_lower_bound(qf, from);
+        printf("first empty slot t: %i, from: %lu\n", t, from);
 		assert(t>=0);
 		if (t == 0)
 			break;
@@ -1726,7 +1755,6 @@ static inline int32_t add_memento_to_sorted_list(QF *qf, const uint64_t bucket_i
     const uint64_t f2 = GET_FINGERPRINT(qf, pos + 1);
     const uint64_t m2 = GET_MEMENTO(qf, pos + 1);
     const uint64_t memento_bits = qf->metadata->memento_bits;
-
     const bool singleton_prefix_set = (is_runend(qf, pos) || f1 <= f2);
     if (singleton_prefix_set) {
         if (new_memento == m1) {
@@ -1759,7 +1787,6 @@ static inline int32_t add_memento_to_sorted_list(QF *qf, const uint64_t bucket_i
         }
         return 0;
     }
-
     const bool size_two_prefix_set = (m1 < m2);
     if (size_two_prefix_set) {
         if (qf->metadata->bits_per_slot < 2 * qf->metadata->memento_bits) {
@@ -1834,7 +1861,6 @@ static inline int32_t add_memento_to_sorted_list(QF *qf, const uint64_t bucket_i
         }
         return 0;
     }
-
     if (new_memento < m2) {
         set_slot(qf, pos + 1, (f2 << memento_bits) | new_memento);
         new_memento = m2;
@@ -2375,7 +2401,7 @@ uint64_t qf_init(QF *qf, uint64_t nslots, uint64_t key_bits, uint64_t memento_bi
 // TODO PAGES FILTER
 static inline uint64_t init_filter_pages(QF *qf, uint64_t nslots, uint64_t key_bits,
         uint64_t memento_bits, enum qf_hashmode hash_mode, uint32_t seed,
-        page_handle **pages, uint64_t n_pages, const uint64_t orig_quotient_bit_cnt)
+        page_handle **pages, uint64_t n_pages, uint64_t x_pages, const uint64_t orig_quotient_bit_cnt)
 {
    printf("\n");
    printf("hello, filter init\n");
@@ -2387,9 +2413,12 @@ static inline uint64_t init_filter_pages(QF *qf, uint64_t nslots, uint64_t key_b
    /* nslots can be any number now, as opposed to just being able to be a power
     * of 2! */
    num_slots        = nslots;
-   xnslots          = nslots + 10 * sqrt((double)nslots);
+   xnslots = nslots + x_pages * 16 * QF_SLOTS_PER_BLOCK;
+//    xnslots          = nslots + 10*sqrt((double) nslots);
+
+
 //    nblocks          = (xnslots + QF_SLOTS_PER_BLOCK - 1) / QF_SLOTS_PER_BLOCK;
-   nblocks = n_pages;
+   nblocks = 16 * (n_pages + x_pages);
    fingerprint_bits = key_bits;
    while (nslots > 1) {
       assert(fingerprint_bits > 0);
@@ -2423,7 +2452,8 @@ static inline uint64_t init_filter_pages(QF *qf, uint64_t nslots, uint64_t key_b
     printf("magic: %lu\n", qf->metadata->magic_endian_number);
 	qf->metadata->auto_resize = 0;
 	qf->metadata->hash_mode = hash_mode;
-	qf->metadata->total_size_in_bytes = size;
+	// qf->metadata->total_size_in_bytes = size;
+    qf->metadata->total_size_in_bytes = total_num_bytes;
 	qf->metadata->seed = seed;
 	qf->metadata->nslots = num_slots;
 	qf->metadata->xnslots = xnslots;
@@ -2442,7 +2472,7 @@ static inline uint64_t init_filter_pages(QF *qf, uint64_t nslots, uint64_t key_b
                             + qf->metadata->memento_bits;
 	// qf->metadata->nblocks = (qf->metadata->xnslots + QF_SLOTS_PER_BLOCK - 1) \
     //                         / QF_SLOTS_PER_BLOCK;
-    qf->metadata->nblocks = n_pages;
+    qf->metadata->nblocks = nblocks;
 	qf->metadata->nelts = 0;
 	qf->metadata->ndistinct_elts = 0;
 	qf->metadata->noccupied_slots = 0;
@@ -2478,10 +2508,10 @@ static inline uint64_t init_filter_pages(QF *qf, uint64_t nslots, uint64_t key_b
 
 uint64_t qf_init_pages(QF *qf, uint64_t nslots, uint64_t key_bits, 
     uint64_t memento_bits, enum qf_hashmode hash_mode, 
-    uint32_t seed, page_handle **pages, uint64_t n_pages)
+    uint32_t seed, page_handle **pages, uint64_t n_pages, uint64_t x_pages)
 {
     return init_filter_pages(qf, nslots, key_bits, memento_bits, hash_mode, seed,
-                        pages, n_pages, 0);
+                        pages, n_pages, x_pages, 0);
 }
 
 /*
@@ -2876,37 +2906,46 @@ printf("a\n");
 
 
     //TODO::: SEGFAULT SEGFAULT
+    printf("hash_bucket_index: %lu\n", hash_bucket_index);
     uint64_t runend_index = run_end(qf, hash_bucket_index);
+    printf("after first run_end\n");
     uint64_t runstart_index = hash_bucket_index == 0 ? 0 
                                 : run_end(qf, hash_bucket_index - 1) + 1;
     uint64_t insert_index;
     printf("before is_occupied if\n");
     if (is_occupied(qf, hash_bucket_index)) {
+        printf("occupied sir!\n");
         int64_t fingerprint_pos = runstart_index;
+        printf("fingerprintpos before fn: %li\n");
         bool add_to_sorted_list = false;
         fingerprint_pos = next_matching_fingerprint_in_run(qf, fingerprint_pos,
                                                             hash_fingerprint);
+        printf("fingerprint pos: %li\n", fingerprint_pos);                                                    
         if (fingerprint_pos >= 0 && hash_fingerprint) {
             add_to_sorted_list = true;
             insert_index = fingerprint_pos;
         }
-
+        printf("ben: that seems scary so im gonna print it\n");
         if (add_to_sorted_list) {
+            printf("in add_to_sorted_list if\n");
             // Matching sorted list with a complete fingerprint target 
             res = add_memento_to_sorted_list(qf, hash_bucket_index, insert_index,
                                                                         memento);
-
+            printf("add_memento_to_sorted_list res: %li\n", res);
             if (res < 0)
                 return res;
             res = insert_index - hash_bucket_index;
         }
         else {
             // No fully matching fingerprints found
+            printf("im herre\n");
             insert_index = upper_bound_fingerprint_in_run(qf, runstart_index,
                                                             hash_fingerprint);
+            printf("im herre and now insert_index: %lu\n", insert_index);
             const uint64_t next_empty_slot = find_first_empty_slot(qf, hash_bucket_index);
+            printf("creativity gone\n");
 #ifdef DEBUG
-            assert(next_empty_slot >= insert_index);
+               assert(next_empty_slot >= insert_index);
 #endif /* DEBUG */
 printf("c\n");
             if (insert_index < next_empty_slot) {

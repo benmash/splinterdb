@@ -107,7 +107,7 @@ extern "C" {
 
     uint64_t qf_init_pages(QF *qf, uint64_t nslots, uint64_t key_bits, 
                         uint64_t memento_bits, enum qf_hashmode hash_mode, 
-                        uint32_t seed, page_handle **pages, uint64_t n_pages);
+                        uint32_t seed, page_handle **pages, uint64_t n_pages, uint64_t x_pages);
 
 	/* 
      * Create a Memento filter in `buffer`. Note that this does not initialize

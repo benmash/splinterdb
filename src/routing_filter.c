@@ -450,7 +450,7 @@ routing_filter_add(cache                  *cc,
    // platform_assert(index_addr % extent_size == 0);
    // index_page[0] = cache_alloc(cc, index_addr, PAGE_TYPE_FILTER); // get a pointer to the page in memory
    
-   #define N_PAGES 256 + 1
+   #define N_PAGES 256 + 1 + 2
 
    page_handle *pages[N_PAGES];
 
@@ -459,11 +459,17 @@ routing_filter_add(cache                  *cc,
       // platform_assert(next_index_addr == index_addr + i * page_size);
       // platform_error_log("page addr: %lu\n", next_index_addr);
       pages[i] = cache_alloc(cc, next_index_addr, PAGE_TYPE_FILTER);
+      platform_error_log("memset: %p\n", pages[i]->data);
+      platform_error_log("data before memset: %lu\n", *pages[i]->data);
+      memset(pages[i]->data, 0, 4096);
+      platform_error_log("data after memset: %lu\n", *pages[i]->data);
       // platform_assert(index_page[i] == index_page[0] + i * page_size); //TODO FAILSLSLS; non-contiguous pages in cache
    }
    // filter->addr = index_addr;
 
-   qf_init_pages(&filter->qf, 1024 * (N_PAGES - 1), 38, 9, QF_HASH_NONE, 0xBEEF, pages, N_PAGES);
+   // give up 3 bits for metadata (32 -> 29), need minimum 18 for canonical slot/index -> 11 bits left -> 2 for fingerprint, 9 for memento
+   // ceil(logR) = 9 --> supports range 512
+   qf_init_pages(&filter->qf, 1024 * (N_PAGES - 3), 38, 9, QF_HASH_NONE, 0xBEEF, pages, N_PAGES, 2);
 
    platform_error_log("after init\n");
 

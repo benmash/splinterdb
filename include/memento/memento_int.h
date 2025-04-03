@@ -40,7 +40,7 @@ extern "C" {
 #define QF_BITS_PER_SLOT 29
 
     /* Must be >= 6.  6 seems fastest. */
-#define QF_BLOCK_OFFSET_BITS (10)
+#define QF_BLOCK_OFFSET_BITS (6)
 
 #define QF_SLOTS_PER_BLOCK (1ULL << QF_BLOCK_OFFSET_BITS)
 #define QF_METADATA_WORDS_PER_BLOCK ((QF_SLOTS_PER_BLOCK + 63) / 64)
