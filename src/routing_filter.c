@@ -459,10 +459,7 @@ routing_filter_add(cache                  *cc,
       // platform_assert(next_index_addr == index_addr + i * page_size);
       // platform_error_log("page addr: %lu\n", next_index_addr);
       pages[i] = cache_alloc(cc, next_index_addr, PAGE_TYPE_FILTER);
-      platform_error_log("memset: %p\n", pages[i]->data);
-      platform_error_log("data before memset: %lu\n", *pages[i]->data);
       memset(pages[i]->data, 0, 4096);
-      platform_error_log("data after memset: %lu\n", *pages[i]->data);
       // platform_assert(index_page[i] == index_page[0] + i * page_size); //TODO FAILSLSLS; non-contiguous pages in cache
    }
    // filter->addr = index_addr;
@@ -471,15 +468,12 @@ routing_filter_add(cache                  *cc,
    // ceil(logR) = 9 --> supports range 512
    qf_init_pages(&filter->qf, 1024 * (N_PAGES - 3), 38, 9, QF_HASH_NONE, 0xBEEF, pages, N_PAGES, 2);
 
-   platform_error_log("after init\n");
-
    for (uint64_t i = 0; i < num_new_fp; i++){
       // insert singles rather than sort + batch insert
-      platform_error_log("a-\n");
-      qf_insert_single(&filter->qf, new_fp_arr[i], new_fp_arr[i], QF_NO_LOCK | QF_KEY_IS_HASH);
+      uint64_t memento = new_fp_arr[i] & ((1ULL << 9) - 1);
+      qf_insert_single(&filter->qf, new_fp_arr[i], memento, QF_NO_LOCK | QF_KEY_IS_HASH);
    }
    
-   platform_error_log("after insert_single loop\n");
 
    // platform_error_log("filter->addr: %lu\n", filter->addr);
 

@@ -645,7 +645,6 @@ static inline uint64_t get_slot(const QF *qf, uint64_t index)
 {
 	/* Should use __uint128_t to support up to 64-bit remainders, but gcc seems
 	 * to generate buggy code.  :/  */
-    printf("{ index : %lu , xnslots : %lu }", index, qf->metadata->xnslots);
 	assert(index < qf->metadata->xnslots);
     uint64_t *p = (uint64_t *)&get_block(qf, index /
             QF_SLOTS_PER_BLOCK)->slots[(index %
@@ -739,17 +738,13 @@ static inline uint64_t block_offset(const QF *qf, uint64_t blockidx)
 
 static inline uint64_t run_end(const QF *qf, uint64_t hash_bucket_index)
 {
-    printf("run_end start\n");
 	uint64_t bucket_block_index = hash_bucket_index / QF_SLOTS_PER_BLOCK;
 	uint64_t bucket_intrablock_offset = hash_bucket_index % QF_SLOTS_PER_BLOCK;
 	uint64_t bucket_blocks_offset = block_offset(qf, bucket_block_index);
 
-    printf("blk_idx: %lu, intra ifx: %lu, offset: %lu\n", bucket_block_index, bucket_intrablock_offset, bucket_blocks_offset);
 
     uint64_t bucket_intrablock_rank = bitrank(get_block(qf, bucket_block_index)->occupieds[0],
                                                 bucket_intrablock_offset);
-    printf("pre if\n");
-    printf("bucket_intrablock_rank: %lu\n", bucket_intrablock_rank);
     if (bucket_intrablock_rank == 0) {
        if (bucket_blocks_offset <= bucket_intrablock_offset)
           return hash_bucket_index;
@@ -757,18 +752,13 @@ static inline uint64_t run_end(const QF *qf, uint64_t hash_bucket_index)
           return QF_SLOTS_PER_BLOCK * bucket_block_index + bucket_blocks_offset
                  - 1;
 	}
-    printf("post if\n");
 
 	uint64_t runend_block_index  = bucket_block_index + bucket_blocks_offset /
                                                             QF_SLOTS_PER_BLOCK;
 	uint64_t runend_ignore_bits  = bucket_blocks_offset % QF_SLOTS_PER_BLOCK;
 	uint64_t runend_rank         = bucket_intrablock_rank - 1;
-    printf("runend_blkidx: %lu, ignore: %lu, rank: %lu\n", runend_block_index, runend_ignore_bits, runend_rank);
-    printf("runend block: %p\n", get_block(qf, runend_block_index));
-    printf("runends: %lu\n", get_block(qf, runend_block_index)->runends[0]);
     uint64_t runend_block_offset = bitselectv(get_block(qf, runend_block_index)->runends[0],
                                                         runend_ignore_bits, runend_rank);
-    printf("pre if 2\n");
     if (runend_block_offset == QF_SLOTS_PER_BLOCK) {
        if (bucket_blocks_offset == 0 && bucket_intrablock_rank == 0) {
           /* The block begins in empty space, and this bucket is in that region
@@ -788,7 +778,6 @@ static inline uint64_t run_end(const QF *qf, uint64_t hash_bucket_index)
           } while (runend_block_offset == QF_SLOTS_PER_BLOCK);
        }
     }
-    printf("post if 2\n");
     uint64_t runend_index = QF_SLOTS_PER_BLOCK * runend_block_index +
         runend_block_offset;
     if (runend_index < hash_bucket_index)
@@ -800,15 +789,18 @@ static inline uint64_t run_end(const QF *qf, uint64_t hash_bucket_index)
 static inline int offset_lower_bound(const QF *qf, uint64_t slot_index)
 {
 	const qfblock *b = get_block(qf, slot_index / QF_SLOTS_PER_BLOCK);
-    printf("slot index: %lu, b: %p\n", slot_index, b);
 	const uint64_t slot_offset = slot_index % QF_SLOTS_PER_BLOCK;
 	const uint64_t boffset = b->offset;
 	const uint64_t occupieds = b->occupieds[0] & BITMASK(slot_offset+1);
-    printf("{ slot_offset, boffset, occupieds } = { %lu, %lu, %lu }\n", slot_offset, boffset, occupieds);
+    // printf("{ slot_offset, boffset, occupieds, b->occupieds[0] } = { %lu, %lu, %lu , %lu }\n", slot_offset, boffset, occupieds, b->occupieds[0]);
 	assert(QF_SLOTS_PER_BLOCK == 64);
 	if (boffset <= slot_offset) {
 		const uint64_t runends = (b->runends[0] & BITMASK(slot_offset)) >> boffset;
-		return popcnt(occupieds) - popcnt(runends);
+        if (popcnt(occupieds) - popcnt(runends) < 0){
+            printf("{ slot_offset, boffset, occupieds, runends } = { %lu, %lu, %lu (%lu), %lu (%lu) }\n", slot_offset, boffset, occupieds, popcnt(occupieds), runends, popcnt(runends));
+            qf_dump_block(qf, slot_index / QF_SLOTS_PER_BLOCK);
+        }
+        return popcnt(occupieds) - popcnt(runends); // TODO: fails / returns negative
 	}
 	return boffset - slot_offset + popcnt(occupieds);
 }
@@ -844,8 +836,7 @@ static inline uint64_t find_first_empty_slot(QF *qf, uint64_t from)
 {
 	do {
 		int t = offset_lower_bound(qf, from);
-        printf("first empty slot t: %i, from: %lu\n", t, from);
-		assert(t>=0);
+		assert(t>=0); // TODO: FAILS THIS ASSERTION
 		if (t == 0)
 			break;
 		from = from + t;
@@ -2403,8 +2394,6 @@ static inline uint64_t init_filter_pages(QF *qf, uint64_t nslots, uint64_t key_b
         uint64_t memento_bits, enum qf_hashmode hash_mode, uint32_t seed,
         page_handle **pages, uint64_t n_pages, uint64_t x_pages, const uint64_t orig_quotient_bit_cnt)
 {
-   printf("\n");
-   printf("hello, filter init\n");
    uint64_t num_slots, xnslots, nblocks;
    uint64_t fingerprint_bits, bits_per_slot;
    uint64_t size;
@@ -2418,7 +2407,8 @@ static inline uint64_t init_filter_pages(QF *qf, uint64_t nslots, uint64_t key_b
 
 
 //    nblocks          = (xnslots + QF_SLOTS_PER_BLOCK - 1) / QF_SLOTS_PER_BLOCK;
-   nblocks = 16 * (n_pages + x_pages);
+//    nblocks = 16 * (n_pages + x_pages);
+   nblocks = 16 * (n_pages - x_pages - 1);
    fingerprint_bits = key_bits;
    while (nslots > 1) {
       assert(fingerprint_bits > 0);
@@ -2429,7 +2419,6 @@ static inline uint64_t init_filter_pages(QF *qf, uint64_t nslots, uint64_t key_b
 
 	bits_per_slot = fingerprint_bits + memento_bits;
 
-    printf("QF_BPS: %lu, finger: %lu, memento: %lu\n", QF_BITS_PER_SLOT, fingerprint_bits, memento_bits);
 	assert(QF_BITS_PER_SLOT == 0 || QF_BITS_PER_SLOT == bits_per_slot);
 	assert(bits_per_slot > 1);
 #if QF_BITS_PER_SLOT == 8 || QF_BITS_PER_SLOT == 16 || QF_BITS_PER_SLOT == 32 || QF_BITS_PER_SLOT == 64 // TODO size TODO bytes
@@ -2440,7 +2429,6 @@ static inline uint64_t init_filter_pages(QF *qf, uint64_t nslots, uint64_t key_b
 #endif
 
 	total_num_bytes = sizeof(qfmetadata) + size;
-    printf("pages: %p, total num bytes %lu\n", pages, total_num_bytes);
 	if (pages == NULL || total_num_bytes > 4096 * n_pages)
 		return total_num_bytes;
 	// memset(buffer, 0, total_num_bytes);
@@ -2449,7 +2437,6 @@ static inline uint64_t init_filter_pages(QF *qf, uint64_t nslots, uint64_t key_b
 	qf->pages = (pages + 1);
 
 	qf->metadata->magic_endian_number = MAGIC_NUMBER;
-    printf("magic: %lu\n", qf->metadata->magic_endian_number);
 	qf->metadata->auto_resize = 0;
 	qf->metadata->hash_mode = hash_mode;
 	// qf->metadata->total_size_in_bytes = size;
@@ -2464,9 +2451,6 @@ static inline uint64_t init_filter_pages(QF *qf, uint64_t nslots, uint64_t key_b
 	qf->metadata->memento_bits = memento_bits;
 	qf->metadata->fingerprint_bits = fingerprint_bits;
 	qf->metadata->bits_per_slot = bits_per_slot;
-
-    printf("midway \n");
-
 	qf->metadata->range = qf->metadata->nslots;
 	qf->metadata->range <<= qf->metadata->fingerprint_bits \
                             + qf->metadata->memento_bits;
@@ -2476,22 +2460,17 @@ static inline uint64_t init_filter_pages(QF *qf, uint64_t nslots, uint64_t key_b
 	qf->metadata->nelts = 0;
 	qf->metadata->ndistinct_elts = 0;
 	qf->metadata->noccupied_slots = 0;
-    printf("semi-endway\n");
-    printf("meta size: %lu", sizeof(qfruntime));
 
 	// qf->runtimedata->num_locks = (qf->metadata->xnslots / NUM_SLOTS_TO_LOCK) + 2;
     qf->runtimedata->num_locks = 2;
-    printf("p2\n");
 	qf->runtimedata->f_info.filepath = NULL;
 
 	/* initialize all the locks to 0 */
 	qf->runtimedata->metadata_lock = 0;
-    printf("b4 calloc\n");
 	qf->runtimedata->locks = (volatile int *)calloc(qf->runtimedata->num_locks, 
                                                     sizeof(volatile int));
 
 	if (qf->runtimedata->locks == NULL) {
-        printf("calloc fail\n");
 		perror("Couldn't allocate memory for runtime locks.");
 		exit(EXIT_FAILURE);
 	}
@@ -2829,25 +2808,18 @@ int qf_insert_mementos(QF *qf, uint64_t key, uint64_t mementos[], uint64_t memen
 
 int64_t qf_insert_single(QF *qf, uint64_t key, uint64_t memento, uint8_t flags)     // NEW IN MEMENTO
 {
-    printf("p\n");
-#ifdef DEBUG
+// #ifdef DEBUG
     uint64_t occupied_cnt = 0, runend_cnt = 0;
     for (uint32_t i = 0; i < qf->metadata->nblocks; i++) {
         occupied_cnt += popcnt(get_block(qf, i)->occupieds[0]);
         runend_cnt += popcnt(get_block(qf, i)->runends[0]);
         assert(occupied_cnt >= runend_cnt);
     }
+    // printf("key: %lu, memento: %lu ; { occupied_cnt, runend_cnt }: { %lu, %lu }\n", key, memento, occupied_cnt, runend_cnt);
     assert(occupied_cnt == runend_cnt);
-#endif /* DEBUG */
-printf("a\n");
+//#endif /* DEBUG */
 	// We fill up the CQF up to 95% load factor.
 	// This is a very conservative check.
-    printf("0: %lu\n", *qf);
-    printf("0.25: %p\n", qf->metadata);
-    printf("1: %lu\n", qf->metadata->noccupied_slots);
-    printf("2 %lf\n", qf->metadata->nslots * 0.95);
-    printf("3: %lu\n", qf->metadata->noccupied_slots + 1);
-    printf("4: %lu\n", qf->metadata->nslots);
     if (qf->metadata->noccupied_slots >= qf->metadata->nslots * 0.95
         || qf->metadata->noccupied_slots + 1 >= qf->metadata->nslots)
     {
@@ -2857,11 +2829,9 @@ printf("a\n");
     CQF.\n"); fflush(stderr); qf_resize_malloc(qf, qf->metadata->nslots * 2);
     perror("RESIZING DONE");
        } else {*/
-       printf("return :( \n");
        return QF_NO_SPACE;
        //}
 	}
-    printf("b\n");
 	if (GET_KEY_HASH(flags) != QF_KEY_IS_HASH) {
 		if (qf->metadata->hash_mode == QF_HASH_DEFAULT) {
 			key = MurmurHash64A(((void *)&key), sizeof(key), qf->metadata->seed);
@@ -2879,16 +2849,12 @@ printf("a\n");
     key |= fast_reduced_part;
 	uint64_t hash = key;
 
-    printf("hashmidway\n");
-
 	int64_t res = 0;
     const uint32_t bucket_index_hash_size = qf->metadata->key_bits - qf->metadata->fingerprint_bits;
     const uint64_t hash_fingerprint = (hash >> bucket_index_hash_size) & BITMASK(qf->metadata->fingerprint_bits);
     const uint32_t orig_quotient_size = qf->metadata->original_quotient_bits;
 	const uint64_t hash_bucket_index = (fast_reduced_part << (bucket_index_hash_size - orig_quotient_size))
                         | ((hash >> orig_quotient_size) & BITMASK(bucket_index_hash_size - orig_quotient_size));
-
-    printf("hashsmei\n");
 
 #ifdef DEBUG
     fprintf(stderr, "noccupied_slots=%lu ||| INSERTING SINGLE key=%lu memento=%lu --- hash_bucket_index=%lu hash_fingerprint=", qf->metadata->noccupied_slots, key, memento, hash_bucket_index);
@@ -2897,57 +2863,42 @@ printf("a\n");
     fprintf(stderr, "\n");
     fflush(stderr);
 #endif /* DEBUG */
-    printf("start\n");
 	if (GET_NO_LOCK(flags) != QF_NO_LOCK) {
 		if (!qf_lock(qf, hash_bucket_index, /*small*/ true, flags))
 			return QF_COULDNT_LOCK;
 	}
-    printf("after\n");
 
 
     //TODO::: SEGFAULT SEGFAULT
-    printf("hash_bucket_index: %lu\n", hash_bucket_index);
     uint64_t runend_index = run_end(qf, hash_bucket_index);
-    printf("after first run_end\n");
     uint64_t runstart_index = hash_bucket_index == 0 ? 0 
                                 : run_end(qf, hash_bucket_index - 1) + 1;
     uint64_t insert_index;
-    printf("before is_occupied if\n");
     if (is_occupied(qf, hash_bucket_index)) {
-        printf("occupied sir!\n");
         int64_t fingerprint_pos = runstart_index;
-        printf("fingerprintpos before fn: %li\n");
         bool add_to_sorted_list = false;
         fingerprint_pos = next_matching_fingerprint_in_run(qf, fingerprint_pos,
                                                             hash_fingerprint);
-        printf("fingerprint pos: %li\n", fingerprint_pos);                                                    
         if (fingerprint_pos >= 0 && hash_fingerprint) {
             add_to_sorted_list = true;
             insert_index = fingerprint_pos;
         }
-        printf("ben: that seems scary so im gonna print it\n");
         if (add_to_sorted_list) {
-            printf("in add_to_sorted_list if\n");
             // Matching sorted list with a complete fingerprint target 
             res = add_memento_to_sorted_list(qf, hash_bucket_index, insert_index,
                                                                         memento);
-            printf("add_memento_to_sorted_list res: %li\n", res);
             if (res < 0)
                 return res;
             res = insert_index - hash_bucket_index;
         }
         else {
             // No fully matching fingerprints found
-            printf("im herre\n");
             insert_index = upper_bound_fingerprint_in_run(qf, runstart_index,
                                                             hash_fingerprint);
-            printf("im herre and now insert_index: %lu\n", insert_index);
             const uint64_t next_empty_slot = find_first_empty_slot(qf, hash_bucket_index);
-            printf("creativity gone\n");
 #ifdef DEBUG
                assert(next_empty_slot >= insert_index);
 #endif /* DEBUG */
-printf("c\n");
             if (insert_index < next_empty_slot) {
                 shift_slots(qf, insert_index, next_empty_slot - 1, 1);
                 shift_runends(qf, insert_index, next_empty_slot - 1, 1);
@@ -2959,7 +2910,6 @@ printf("c\n");
                     get_block(qf, i)->offset++;
             }
 
-            printf("d\n");
             set_slot(qf, insert_index, (hash_fingerprint << qf->metadata->memento_bits) 
                                         | memento);
             METADATA_WORD(qf, runends, runend_index) &= ~(1ULL << 
@@ -2988,14 +2938,12 @@ printf("c\n");
         }
         set_slot(qf, insert_index, (hash_fingerprint << qf->metadata->memento_bits)
                                                                     | memento);
-        printf("e\n");
         for (uint32_t i = hash_bucket_index / QF_SLOTS_PER_BLOCK + 1; 
                 i <= next_empty_slot / QF_SLOTS_PER_BLOCK; i++) {
             if (get_block(qf, i)->offset + 1
                     <= BITMASK(8 * sizeof(uint16_t)))
                 get_block(qf, i)->offset++;
         }
-        printf("f\n");
         METADATA_WORD(qf, runends, insert_index) |= 1ULL << 
                 ((insert_index % QF_SLOTS_PER_BLOCK) % 64);
         METADATA_WORD(qf, occupieds, hash_bucket_index) |= 1ULL <<
