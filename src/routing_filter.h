@@ -24,6 +24,8 @@
  #define MAX_FILTERS       32
  #define ROUTING_NOT_FOUND (UINT16_MAX)
 
+ #define N_PAGES (256 + 1 + 2)
+
  
  
  /*

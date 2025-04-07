@@ -335,7 +335,7 @@ routing_filter_add(cache                  *cc,
                    uint16                  value)
 {
    ZERO_CONTENTS(filter);
-
+   // TODO old filter add fingerprints t
    
    
    
@@ -450,7 +450,7 @@ routing_filter_add(cache                  *cc,
    // platform_assert(index_addr % extent_size == 0);
    // index_page[0] = cache_alloc(cc, index_addr, PAGE_TYPE_FILTER); // get a pointer to the page in memory
    
-   #define N_PAGES 256 + 1 + 2
+   
 
    page_handle *pages[N_PAGES];
 
@@ -462,7 +462,8 @@ routing_filter_add(cache                  *cc,
       memset(pages[i]->data, 0, 4096);
       // platform_assert(index_page[i] == index_page[0] + i * page_size); //TODO FAILSLSLS; non-contiguous pages in cache
    }
-   // filter->addr = index_addr;
+   
+   filter->addr = pages[0]->disk_addr;
 
    // give up 3 bits for metadata (32 -> 29), need minimum 18 for canonical slot/index -> 11 bits left -> 2 for fingerprint, 9 for memento
    // ceil(logR) = 9 --> supports range 512
