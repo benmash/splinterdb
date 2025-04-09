@@ -118,7 +118,7 @@ extern "C" {
      */
 	uint64_t qf_use(QF *qf, void *buffer, uint64_t buffer_len);
 
-    uint64_t qf_use_pages(QF *qf, page_handle *pages, uint64_t n_pages);
+    uint64_t qf_use_pages(QF *qf, page_handle **pages);
 
 	/* 
      * Destroy this Memento filter. Returns a pointer to the memory that the

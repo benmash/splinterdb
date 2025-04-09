@@ -55,7 +55,7 @@
     uint32 num_fingerprints;
     uint32 num_unique;
     uint32 value_size;
-    QF qf;
+   //  QF qf;
  } routing_filter;
  
  struct routing_async_ctxt;

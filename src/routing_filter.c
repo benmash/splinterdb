@@ -335,9 +335,9 @@ routing_filter_add(cache                  *cc,
                    uint16                  value)
 {
    ZERO_CONTENTS(filter);
-   // TODO old filter add fingerprints t
+   // TODO old filter add fingerprints
    
-   
+   platform_assert(value < 24);
    
 
    // // old filter
@@ -364,9 +364,7 @@ routing_filter_add(cache                  *cc,
 
    // compute parameters
 
-   // TODO -- determine number of bytes needed to init memento
-
-   // filter->num_fingerprints = num_new_fp + old_filter->num_fingerprints;
+   filter->num_fingerprints = num_new_fp + old_filter->num_fingerprints;
    // filter->num_unique       = 0;
 
    // uint32 log_num_buckets = 31 - __builtin_clz(filter->num_fingerprints);
@@ -450,30 +448,51 @@ routing_filter_add(cache                  *cc,
    // platform_assert(index_addr % extent_size == 0);
    // index_page[0] = cache_alloc(cc, index_addr, PAGE_TYPE_FILTER); // get a pointer to the page in memory
    
-   
+   platform_error_log("before alloc, olf_filter->addr = %lu\n", old_filter->addr);
 
-   page_handle *pages[N_PAGES];
+   page_handle *pages[N_PAGES * 24];
 
-   for (uint64 i = 0; i < N_PAGES; i++) {
+   for (uint64 i = 0; i < N_PAGES * 24; i++) {
       uint64 next_index_addr = mini_alloc(&mini, 0, NULL_KEY, NULL);
       // platform_assert(next_index_addr == index_addr + i * page_size);
-      // platform_error_log("page addr: %lu\n", next_index_addr);
+      
+      // platform_error_log("new addr: %lu, old addr: %lu, loop i: %lu\n", filter->addr, old_filter->addr, i);
+
+
       pages[i] = cache_alloc(cc, next_index_addr, PAGE_TYPE_FILTER);
-      memset(pages[i]->data, 0, 4096);
-      // platform_assert(index_page[i] == index_page[0] + i * page_size); //TODO FAILSLSLS; non-contiguous pages in cache
+
+
+      if (old_filter->addr != 0){
+         page_handle *old_page = cache_get(cc, old_filter->addr + i * page_size, TRUE, PAGE_TYPE_FILTER);
+
+         memcpy(pages[i]->data, old_page->data, 4096);
+
+         // cache_unget(cc, old_page);
+         
+
+      } else{
+
+         memset(pages[i]->data, 0, 4096);
+
+      }
    }
    
    filter->addr = pages[0]->disk_addr;
+   platform_error_log("filter->addr = %lu old_filter->addr = %lu\n", filter->addr, old_filter->addr);
 
+   QF qf;
    // give up 3 bits for metadata (32 -> 29), need minimum 18 for canonical slot/index -> 11 bits left -> 2 for fingerprint, 9 for memento
    // ceil(logR) = 9 --> supports range 512
-   qf_init_pages(&filter->qf, 1024 * (N_PAGES - 3), 38, 9, QF_HASH_NONE, 0xBEEF, pages, N_PAGES, 2);
+   qf_init_pages(&qf, 1024 * (N_PAGES - 3), 38, 9, QF_HASH_NONE, 0xBEEF, pages + (value * N_PAGES), N_PAGES, 2);
+   
 
    for (uint64_t i = 0; i < num_new_fp; i++){
       // insert singles rather than sort + batch insert
       uint64_t memento = new_fp_arr[i] & ((1ULL << 9) - 1);
-      qf_insert_single(&filter->qf, new_fp_arr[i], memento, QF_NO_LOCK | QF_KEY_IS_HASH);
+      qf_insert_single(&qf, new_fp_arr[i], memento, QF_NO_LOCK | QF_KEY_IS_HASH);
+      // platform_error_log("added: {%u, %lu}\n", new_fp_arr[i], memento);
    }
+   
    
 
    // platform_error_log("filter->addr: %lu\n", filter->addr);
@@ -676,13 +695,14 @@ routing_filter_add(cache                  *cc,
    //IMPORTANT: probably still need this V
    // routing_unlock_and_unget_page(cc, filter_page);
 
-   for (uint64 i = 0; i < N_PAGES; i++) {
+   for (uint64 i = 0; i < N_PAGES * 24; i++) {
       routing_unlock_and_unget_page(cc, pages[i]);
    }
 
    mini_release(&mini, NULL_KEY);
 
    // platform_free(PROCESS_PRIVATE_HEAP_ID, temp);
+   
 
    return STATUS_OK;
 }
@@ -887,71 +907,105 @@ routing_filter_lookup(cache          *cc,
       return STATUS_OK;
    }
 
+   platform_error_log("lookup filter->addr = %lu\n", filter->addr);
+
    hash_fn hash       = cfg->hash;
    uint64  seed       = cfg->seed;
    uint64  index_size = cfg->index_size;
+   uint64  page_size  = cache_config_page_size(cfg->cache_cfg);
 
    uint32 fp = hash(key_data(target), key_length(target), seed);
    fp >>= 32 - cfg->fingerprint_size;
-   size_t value_size      = filter->value_size;
-   uint32 log_num_buckets = 31 - __builtin_clz(filter->num_fingerprints);
-   if (log_num_buckets < cfg->log_index_size) {
-      log_num_buckets = cfg->log_index_size;
-   }
-   uint32 remainder_size           = cfg->fingerprint_size - log_num_buckets;
-   size_t remainder_and_value_size = remainder_size + value_size;
-   uint32 bucket =
-      routing_get_bucket(fp << value_size, remainder_and_value_size);
-   uint32 bucket_off = bucket % index_size;
-   size_t index_remainder_and_value_size =
-      remainder_size + value_size + cfg->log_index_size;
-   uint32 remainder_mask = (1UL << remainder_size) - 1;
-   uint32 index =
-      routing_get_index(fp << value_size, index_remainder_and_value_size);
-   uint32 remainder = fp & remainder_mask;
 
-   page_handle *filter_node;
-   routing_hdr *hdr =
-      routing_get_header(cc, cfg, filter->addr, index, &filter_node);
-   uint64 encoding_size = (hdr->num_remainders + index_size - 1) / 8 + 4;
-   uint64 header_length = encoding_size + sizeof(routing_hdr);
+   uint32 memento = fp & ((1ULL << 9) - 1);
 
-   uint64 start, end;
-   routing_get_bucket_bounds(
-      hdr->encoding, header_length, bucket_off, &start, &end);
-   char *remainder_block_start = (char *)hdr + header_length;
+   uint64_t found_values_int = 0;
+   
+   page_handle *pages[N_PAGES * 24];
 
-   // platform_default_log("routing_filter_lookup: "
-   //      "index 0x%lx bucket 0x%lx (0x%lx) remainder 0x%x start %lu end
-   //      %lu\n", index, bucket, bucket % index_size, remainder, start, end);
-
-   if (start == end) {
-      routing_unget_header(cc, filter_node);
-      *found_values = 0;
-      return STATUS_OK;
+   for (uint64_t i = 0; i < N_PAGES * 24; i++) {
+      
+      pages[i] = cache_get(cc, filter->addr + i * page_size, TRUE, PAGE_TYPE_FILTER);
    }
 
-   uint64 found_values_int = 0;
-   for (uint32 i = 0; i < end - start; i++) {
-      uint32 pos = end - i - 1;
-      uint32 found_remainder_and_value;
-      routing_filter_get_remainder_and_value(cfg,
-                                             (uint32 *)remainder_block_start,
-                                             pos,
-                                             &found_remainder_and_value,
-                                             remainder_and_value_size);
-      uint32 found_remainder = found_remainder_and_value >> value_size;
-      if (found_remainder == remainder) {
-         uint32 value_mask  = (1UL << value_size) - 1;
-         uint16 found_value = found_remainder_and_value & value_mask;
-         platform_assert(found_value < 64);
-         found_values_int |= (1UL << found_value);
-      }
+   for (uint16_t val = 0; val < 24; val++) {
+      QF qf;
+
+      qf_use_pages(&qf, pages + (N_PAGES * val));
+
+      int found = qf_point_query(&qf, fp, memento, QF_NO_LOCK | QF_KEY_IS_HASH);
+
+      if (found != 0)
+         found_values_int |= (1UL << val);
    }
 
-   routing_unget_header(cc, filter_node);
+   for (uint64_t i = 0; i < N_PAGES * 24; i++) {
+      cache_unget(cc, pages[i]);
+   }
+
    *found_values = found_values_int;
    return STATUS_OK;
+
+   // size_t value_size      = filter->value_size;
+   // uint32 log_num_buckets = 31 - __builtin_clz(filter->num_fingerprints);
+   // if (log_num_buckets < cfg->log_index_size) {
+   //    log_num_buckets = cfg->log_index_size;
+   // }
+   // uint32 remainder_size           = cfg->fingerprint_size - log_num_buckets;
+   // size_t remainder_and_value_size = remainder_size + value_size;
+   
+   // uint32 bucket =
+   //    routing_get_bucket(fp << value_size, remainder_and_value_size);
+   // uint32 bucket_off = bucket % index_size;
+   // size_t index_remainder_and_value_size =
+   //    remainder_size + value_size + cfg->log_index_size;
+   // uint32 remainder_mask = (1UL << remainder_size) - 1;
+   // uint32 index =
+   //    routing_get_index(fp << value_size, index_remainder_and_value_size);
+   // uint32 remainder = fp & remainder_mask;
+
+   // page_handle *filter_node;
+   // routing_hdr *hdr =
+   //    routing_get_header(cc, cfg, filter->addr, index, &filter_node);
+   // uint64 encoding_size = (hdr->num_remainders + index_size - 1) / 8 + 4;
+   // uint64 header_length = encoding_size + sizeof(routing_hdr);
+
+   // uint64 start, end;
+   // routing_get_bucket_bounds(
+   //    hdr->encoding, header_length, bucket_off, &start, &end);
+   // char *remainder_block_start = (char *)hdr + header_length;
+
+   // // platform_default_log("routing_filter_lookup: "
+   // //      "index 0x%lx bucket 0x%lx (0x%lx) remainder 0x%x start %lu end
+   // //      %lu\n", index, bucket, bucket % index_size, remainder, start, end);
+
+   // if (start == end) {
+   //    routing_unget_header(cc, filter_node);
+   //    *found_values = 0;
+   //    return STATUS_OK;
+   // }
+
+   // uint64 found_values_int = 0;
+   // for (uint32 i = 0; i < end - start; i++) {
+   //    uint32 pos = end - i - 1;
+   //    uint32 found_remainder_and_value;
+   //    routing_filter_get_remainder_and_value(cfg,
+   //                                           (uint32 *)remainder_block_start,
+   //                                           pos,
+   //                                           &found_remainder_and_value,
+   //                                           remainder_and_value_size);
+   //    uint32 found_remainder = found_remainder_and_value >> value_size;
+   //    if (found_remainder == remainder) {
+   //       uint32 value_mask  = (1UL << value_size) - 1;
+   //       uint16 found_value = found_remainder_and_value & value_mask;
+   //       platform_assert(found_value < 64);
+   //       found_values_int |= (1UL << found_value);
+   //    }
+   // }
+
+   // routing_unget_header(cc, filter_node);
+   // *found_values = found_values_int;
+   // return STATUS_OK;
 }
 
 /*

@@ -800,7 +800,7 @@ static inline int offset_lower_bound(const QF *qf, uint64_t slot_index)
             printf("{ slot_offset, boffset, occupieds, runends } = { %lu, %lu, %lu (%lu), %lu (%lu) }\n", slot_offset, boffset, occupieds, popcnt(occupieds), runends, popcnt(runends));
             qf_dump_block(qf, slot_index / QF_SLOTS_PER_BLOCK);
         }
-        return popcnt(occupieds) - popcnt(runends); // TODO: fails / returns negative
+        return popcnt(occupieds) - popcnt(runends);
 	}
 	return boffset - slot_offset + popcnt(occupieds);
 }
@@ -836,7 +836,7 @@ static inline uint64_t find_first_empty_slot(QF *qf, uint64_t from)
 {
 	do {
 		int t = offset_lower_bound(qf, from);
-		assert(t>=0); // TODO: FAILS THIS ASSERTION
+		assert(t>=0);
 		if (t == 0)
 			break;
 		from = from + t;
@@ -2321,7 +2321,7 @@ static inline uint64_t init_filter(QF *qf, uint64_t nslots, uint64_t key_bits,
 	bits_per_slot = fingerprint_bits + memento_bits;
 	assert(QF_BITS_PER_SLOT == 0 || QF_BITS_PER_SLOT == bits_per_slot);
 	assert(bits_per_slot > 1);
-#if QF_BITS_PER_SLOT == 8 || QF_BITS_PER_SLOT == 16 || QF_BITS_PER_SLOT == 32 || QF_BITS_PER_SLOT == 64 // TODO size TODO bytes
+#if QF_BITS_PER_SLOT == 8 || QF_BITS_PER_SLOT == 16 || QF_BITS_PER_SLOT == 32 || QF_BITS_PER_SLOT == 64 
 	size = nblocks * sizeof(qfblock);
 #else
 	size = nblocks * (sizeof(qfblock) + QF_SLOTS_PER_BLOCK * bits_per_slot / 8);
@@ -2389,7 +2389,6 @@ uint64_t qf_init(QF *qf, uint64_t nslots, uint64_t key_bits, uint64_t memento_bi
                         buffer, buffer_len, 0);
 }*/
 
-// TODO PAGES FILTER
 static inline uint64_t init_filter_pages(QF *qf, uint64_t nslots, uint64_t key_bits,
         uint64_t memento_bits, enum qf_hashmode hash_mode, uint32_t seed,
         page_handle **pages, uint64_t n_pages, uint64_t x_pages, const uint64_t orig_quotient_bit_cnt)
@@ -2493,21 +2492,21 @@ uint64_t qf_init_pages(QF *qf, uint64_t nslots, uint64_t key_bits,
                         pages, n_pages, x_pages, 0);
 }
 
-/*
-uint64_t qf_use(QF* qf, void* buffer, uint64_t buffer_len)
-{
-	qf->metadata = (qfmetadata *)(buffer);
-	if (qf->metadata->total_size_in_bytes + sizeof(qfmetadata) > buffer_len) {
-		return qf->metadata->total_size_in_bytes + sizeof(qfmetadata);
-	}
-    //TODO: change
-	qf->blocks = (qfblock *)(qf->metadata + 1);
 
-	qf->runtimedata = (qfruntime *)calloc(sizeof(qfruntime), 1);
-	if (qf->runtimedata == NULL) {
-		perror("Couldn't allocate memory for runtime data.");
-		exit(EXIT_FAILURE);
-	}
+uint64_t qf_use_pages(QF* qf, page_handle **pages)
+{
+
+    qf->metadata = (qfmetadata *) (pages[0]->data);
+    qf->runtimedata = (qfruntime *) (qf->metadata + 1);
+	qf->pages = (pages + 1);
+	// if (qf->metadata->total_size_in_bytes + sizeof(qfmetadata) > buffer_len) {
+	// 	return qf->metadata->total_size_in_bytes + sizeof(qfmetadata);
+	// }
+
+	// if (qf->runtimedata == NULL) {
+	// 	perror("Couldn't allocate memory for runtime data.");
+	// 	exit(EXIT_FAILURE);
+	// }
 	// initialize all the locks to 0 
 	qf->runtimedata->metadata_lock = 0;
 	qf->runtimedata->locks = (volatile int *)calloc(qf->runtimedata->num_locks,
@@ -2516,17 +2515,17 @@ uint64_t qf_use(QF* qf, void* buffer, uint64_t buffer_len)
 		perror("Couldn't allocate memory for runtime locks.");
 		exit(EXIT_FAILURE);
 	}
-#ifdef LOG_WAIT_TIME
-	qf->runtimedata->wait_times = (wait_time_data *)calloc(qf->runtimedata->num_locks + 1,
-															sizeof(wait_time_data));
-	if (qf->runtimedata->wait_times == NULL) {
-		perror("Couldn't allocate memory for runtime wait_times.");
-		exit(EXIT_FAILURE);
-	}
-#endif
+// #ifdef LOG_WAIT_TIME
+// 	qf->runtimedata->wait_times = (wait_time_data *)calloc(qf->runtimedata->num_locks + 1,
+// 															sizeof(wait_time_data));
+// 	if (qf->runtimedata->wait_times == NULL) {
+// 		perror("Couldn't allocate memory for runtime wait_times.");
+// 		exit(EXIT_FAILURE);
+// 	}
+// #endif
 
-	return sizeof(qfmetadata) + qf->metadata->total_size_in_bytes;
-} */
+	return qf->metadata->total_size_in_bytes;
+} 
 
 void *qf_destroy(QF *qf)
 {
@@ -2868,8 +2867,6 @@ int64_t qf_insert_single(QF *qf, uint64_t key, uint64_t memento, uint8_t flags) 
 			return QF_COULDNT_LOCK;
 	}
 
-
-    //TODO::: SEGFAULT SEGFAULT
     uint64_t runend_index = run_end(qf, hash_bucket_index);
     uint64_t runstart_index = hash_bucket_index == 0 ? 0 
                                 : run_end(qf, hash_bucket_index - 1) + 1;
