@@ -347,12 +347,15 @@ routing_filter_add(cache                  *cc,
    // size_t old_value_size               = 0;
    // uint32 old_value_mask               = 0;
    // size_t old_remainder_and_value_size = 0;
-   // if (old_filter->addr != 0) {
-   //    mini_unkeyed_prefetch(cc, PAGE_TYPE_FILTER, old_filter->meta_head);
+   platform_error_log("before prefetch\n");
+   if (old_filter->addr != 0) {
+      mini_unkeyed_prefetch(cc, PAGE_TYPE_FILTER, old_filter->meta_head);
+
+   platform_error_log("after prefetch\n");
    //    old_log_num_buckets = 31 - __builtin_clz(old_filter->num_fingerprints);
    //    if (old_log_num_buckets < cfg->log_index_size) {
    //       old_log_num_buckets = cfg->log_index_size;
-   //    }
+      }
    //    uint32 old_log_num_indices = old_log_num_buckets - cfg->log_index_size;
    //    old_num_indices            = 1UL << old_log_num_indices;
    //    old_remainder_size         = cfg->fingerprint_size - old_log_num_buckets;
@@ -431,6 +434,8 @@ routing_filter_add(cache                  *cc,
    // platform_error_log("memento bytes requested: %lu\n", n_bytes);
    // platform_error_log("page size: %lu, extent size: %lu\n", page_size, extent_size);
    
+   // cache_print_stats(stderr, cc);
+
    // we use a mini_allocator to obtain pages
    allocator      *al = cache_get_allocator(cc);
    uint64          meta_head; // extent - group of pages
@@ -440,37 +445,53 @@ routing_filter_add(cache                  *cc,
    // filters use an unkeyed mini allocator
    mini_allocator mini;
    mini_init(&mini, cc, NULL, filter->meta_head, 0, 1, PAGE_TYPE_FILTER, FALSE);
+   platform_assert(filter->meta_head != old_filter->meta_head);
 
-   // set up the index pages
-   // uint64       addrs_per_page = page_size / sizeof(uint64);
-   // page_handle *index_page[MAX_PAGES_PER_EXTENT];
-   // uint64       index_addr = mini_alloc(&mini, 0, NULL_KEY, NULL);  // get a page from the extent
-   // platform_assert(index_addr % extent_size == 0);
-   // index_page[0] = cache_alloc(cc, index_addr, PAGE_TYPE_FILTER); // get a pointer to the page in memory
-   
-   platform_error_log("before alloc, olf_filter->addr = %lu\n", old_filter->addr);
+      // set up the index pages
+      // uint64       addrs_per_page = page_size / sizeof(uint64);
+      // page_handle *index_page[MAX_PAGES_PER_EXTENT];
+      // uint64       index_addr = mini_alloc(&mini, 0, NULL_KEY, NULL);  // get
+      // a page from the extent platform_assert(index_addr % extent_size == 0);
+      // index_page[0] = cache_alloc(cc, index_addr, PAGE_TYPE_FILTER); // get a
+      // pointer to the page in memory
+
+      platform_error_log("before alloc, old_filter->addr = %lu\n",
+                         old_filter->addr);
 
    page_handle *pages[N_PAGES * 24];
+   platform_assert(filter->addr == 0 || old_filter->addr != filter->addr);
 
    for (uint64 i = 0; i < N_PAGES * 24; i++) {
       uint64 next_index_addr = mini_alloc(&mini, 0, NULL_KEY, NULL);
       // platform_assert(next_index_addr == index_addr + i * page_size);
+      if (i != 0) {
+         //TODO: figure out how to retrive mini_allocator pages
+         platform_assert(next_index_addr == pages[0]->disk_addr + i * page_size);
+      }
       
+
+
       // platform_error_log("new addr: %lu, old addr: %lu, loop i: %lu\n", filter->addr, old_filter->addr, i);
 
-
+      platform_assert(next_index_addr != old_filter->addr + i * page_size);
       pages[i] = cache_alloc(cc, next_index_addr, PAGE_TYPE_FILTER);
 
 
-      if (old_filter->addr != 0){
+      if (old_filter->addr != 0) {
+
+         cache_assert_ungot(cc, old_filter->addr + i * page_size);
+
+         
          page_handle *old_page = cache_get(cc, old_filter->addr + i * page_size, TRUE, PAGE_TYPE_FILTER);
 
-         memcpy(pages[i]->data, old_page->data, 4096);
 
-         // cache_unget(cc, old_page);
+         memcpy(pages[i]->data, old_page->data, 4096);
          
 
-      } else{
+         cache_unget(cc, old_page);
+         
+
+      } else {
 
          memset(pages[i]->data, 0, 4096);
 

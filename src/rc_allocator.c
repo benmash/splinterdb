@@ -33,6 +33,7 @@
  * 339
  */
 #define SHOULD_TRACE(addr) (0) // Do not trace anything
+// #define SHOULD_TRACE(addr) (addr == 86507520ULL)
 
 /*
  *------------------------------------------------------------------------------
