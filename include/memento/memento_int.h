@@ -142,6 +142,11 @@ extern "C" {
         cluster_data *c_info;
     } quotient_filter_iterator;
 
+    typedef struct qf_index_page {
+        uint64_t page_addrs[258];
+        uint64_t next_filter;
+    } qf_index_page;
+
 #ifdef __cplusplus
 }
 #endif

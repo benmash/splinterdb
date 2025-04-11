@@ -2431,7 +2431,13 @@ static inline uint64_t init_filter_pages(QF *qf, uint64_t nslots, uint64_t key_b
 	if (pages == NULL || total_num_bytes > 4096 * n_pages)
 		return total_num_bytes;
 	// memset(buffer, 0, total_num_bytes);
-	qf->metadata = (qfmetadata *) (pages[0]->data);
+
+    qf_index_page *index = (qf_index_page *) (pages[0]->data);
+    for (int i = 1; i < n_pages; i++) {
+        index->page_addrs[i-1] = pages[i]->disk_addr;
+    }
+
+	qf->metadata = (qfmetadata *) (index + 1);
     qf->runtimedata = (qfruntime *) (qf->metadata + 1);
 	qf->pages = (pages + 1);
 

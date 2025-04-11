@@ -447,6 +447,7 @@ routing_filter_add(cache                  *cc,
    mini_init(&mini, cc, NULL, filter->meta_head, 0, 1, PAGE_TYPE_FILTER, FALSE);
    platform_assert(filter->meta_head != old_filter->meta_head);
 
+
       // set up the index pages
       // uint64       addrs_per_page = page_size / sizeof(uint64);
       // page_handle *index_page[MAX_PAGES_PER_EXTENT];
@@ -459,30 +460,46 @@ routing_filter_add(cache                  *cc,
                          old_filter->addr);
 
    page_handle *pages[N_PAGES * 24];
-   platform_assert(filter->addr == 0 || old_filter->addr != filter->addr);
+   // platform_assert(filter->addr == 0 || old_filter->addr != filter->addr);
 
-   for (uint64 i = 0; i < N_PAGES * 24; i++) {
-      uint64 next_index_addr = mini_alloc(&mini, 0, NULL_KEY, NULL);
-      // platform_assert(next_index_addr == index_addr + i * page_size);
-      if (i != 0) {
-         //TODO: figure out how to retrive mini_allocator pages
-         platform_assert(next_index_addr == pages[0]->disk_addr + i * page_size);
-      }
-      
+   uint64_t i = 0;
+   if (old_filter->addr != 0) {
+      page_handle *old_index_page = cache_get(cc, old_filter->addr, TRUE, PAGE_TYPE_FILTER);
+      qf_index_page *old_index = (qf_index_page *) (old_index_page->data);
+
+      uint64_t next_index_addr = mini_alloc(&mini, 0, NULL_KEY, NULL);
+      pages[0] = cache_alloc(cc, next_index_addr, PAGE_TYPE_FILTER);
+      memset(pages[0]->data, 0, 4096);
+      i++;
+
+      for (; i < N_PAGES * 24; i++) {
+         if (i > 0 && i % N_PAGES == 0 && old_index->next_filter != 0) {
+            uint64_t next_filter_addr = old_index->next_filter;
+            cache_unget(cc, old_index_page);
+            old_index_page = cache_get(cc, next_filter_addr, TRUE, PAGE_TYPE_FILTER);
+            old_index = (qf_index_page *) (old_index_page->data);
+
+            next_index_addr = mini_alloc(&mini, 0, NULL_KEY, NULL);
+            pages[i] = cache_alloc(cc, next_index_addr, PAGE_TYPE_FILTER);
+            memset(pages[i]->data, 0, 4096);
+            continue;
+         } else if (i > 0 && i % N_PAGES == 0 && old_index->next_filter == 0) {
+            // cache_unget(cc, old_index_page);
+            // i++;
+            platform_error_log("i++ = %lu\n", i);
+            break;
+         }
+
+         next_index_addr = mini_alloc(&mini, 0, NULL_KEY, NULL);
+         
+
+         pages[i] = cache_alloc(cc, next_index_addr, PAGE_TYPE_FILTER);
 
 
-      // platform_error_log("new addr: %lu, old addr: %lu, loop i: %lu\n", filter->addr, old_filter->addr, i);
-
-      platform_assert(next_index_addr != old_filter->addr + i * page_size);
-      pages[i] = cache_alloc(cc, next_index_addr, PAGE_TYPE_FILTER);
-
-
-      if (old_filter->addr != 0) {
-
-         cache_assert_ungot(cc, old_filter->addr + i * page_size);
+         cache_assert_ungot(cc, old_index->page_addrs[(i - 1) % N_PAGES]);
 
          
-         page_handle *old_page = cache_get(cc, old_filter->addr + i * page_size, TRUE, PAGE_TYPE_FILTER);
+         page_handle *old_page = cache_get(cc, old_index->page_addrs[(i - 1) % N_PAGES], TRUE, PAGE_TYPE_FILTER);
 
 
          memcpy(pages[i]->data, old_page->data, 4096);
@@ -490,13 +507,18 @@ routing_filter_add(cache                  *cc,
 
          cache_unget(cc, old_page);
          
-
-      } else {
-
-         memset(pages[i]->data, 0, 4096);
-
       }
+
+      cache_unget(cc, old_index_page);
    }
+   
+   for (; i < N_PAGES * 24; i++) {
+      uint64_t next_index_addr = mini_alloc(&mini, 0, NULL_KEY, NULL);
+      pages[i] = cache_alloc(cc, next_index_addr, PAGE_TYPE_FILTER);
+      memset(pages[i]->data, 0, 4096);
+   }
+   
+   
    
    filter->addr = pages[0]->disk_addr;
    platform_error_log("filter->addr = %lu old_filter->addr = %lu\n", filter->addr, old_filter->addr);
@@ -506,8 +528,11 @@ routing_filter_add(cache                  *cc,
    // ceil(logR) = 9 --> supports range 512
    qf_init_pages(&qf, 1024 * (N_PAGES - 3), 38, 9, QF_HASH_NONE, 0xBEEF, pages + (value * N_PAGES), N_PAGES, 2);
    
-
-   for (uint64_t i = 0; i < num_new_fp; i++){
+   if (value != 0) {
+      ((qf_index_page *) pages[(value - 1) * N_PAGES]->data)->next_filter = pages[value * N_PAGES]->disk_addr;
+   }
+   
+   for (i = 0; i < num_new_fp; i++) {
       // insert singles rather than sort + batch insert
       uint64_t memento = new_fp_arr[i] & ((1ULL << 9) - 1);
       qf_insert_single(&qf, new_fp_arr[i], memento, QF_NO_LOCK | QF_KEY_IS_HASH);
@@ -716,7 +741,7 @@ routing_filter_add(cache                  *cc,
    //IMPORTANT: probably still need this V
    // routing_unlock_and_unget_page(cc, filter_page);
 
-   for (uint64 i = 0; i < N_PAGES * 24; i++) {
+   for (i = 0; i < N_PAGES * 24; i++) {
       routing_unlock_and_unget_page(cc, pages[i]);
    }
 
@@ -1027,6 +1052,7 @@ routing_filter_lookup(cache          *cc,
    // routing_unget_header(cc, filter_node);
    // *found_values = found_values_int;
    // return STATUS_OK;
+   
 }
 
 /*
