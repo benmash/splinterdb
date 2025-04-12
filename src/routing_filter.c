@@ -347,11 +347,9 @@ routing_filter_add(cache                  *cc,
    // size_t old_value_size               = 0;
    // uint32 old_value_mask               = 0;
    // size_t old_remainder_and_value_size = 0;
-   platform_error_log("before prefetch\n");
    if (old_filter->addr != 0) {
       mini_unkeyed_prefetch(cc, PAGE_TYPE_FILTER, old_filter->meta_head);
 
-   platform_error_log("after prefetch\n");
    //    old_log_num_buckets = 31 - __builtin_clz(old_filter->num_fingerprints);
    //    if (old_log_num_buckets < cfg->log_index_size) {
    //       old_log_num_buckets = cfg->log_index_size;
@@ -486,7 +484,6 @@ routing_filter_add(cache                  *cc,
          } else if (i > 0 && i % N_PAGES == 0 && old_index->next_filter == 0) {
             // cache_unget(cc, old_index_page);
             // i++;
-            platform_error_log("i++ = %lu\n", i);
             break;
          }
 
@@ -535,6 +532,7 @@ routing_filter_add(cache                  *cc,
    for (i = 0; i < num_new_fp; i++) {
       // insert singles rather than sort + batch insert
       uint64_t memento = new_fp_arr[i] & ((1ULL << 9) - 1);
+      platform_error_log("add: { fp, memento } = { %lu, %lu }\n", new_fp_arr[i], memento);
       qf_insert_single(&qf, new_fp_arr[i], memento, QF_NO_LOCK | QF_KEY_IS_HASH);
       // platform_error_log("added: {%u, %lu}\n", new_fp_arr[i], memento);
    }
@@ -955,37 +953,58 @@ routing_filter_lookup(cache          *cc,
 
    platform_error_log("lookup filter->addr = %lu\n", filter->addr);
 
-   hash_fn hash       = cfg->hash;
-   uint64  seed       = cfg->seed;
-   uint64  index_size = cfg->index_size;
-   uint64  page_size  = cache_config_page_size(cfg->cache_cfg);
+   hash_fn   hash       = cfg->hash;
+   uint64_t  seed       = cfg->seed;
+   uint64_t  index_size = cfg->index_size;
+   uint64_t  page_size  = cache_config_page_size(cfg->cache_cfg);
 
-   uint32 fp = hash(key_data(target), key_length(target), seed);
-   fp >>= 32 - cfg->fingerprint_size;
-
-   uint32 memento = fp & ((1ULL << 9) - 1);
-
-   uint64_t found_values_int = 0;
+   uint32_t fp = hash(key_data(target), key_length(target), seed);
    
-   page_handle *pages[N_PAGES * 24];
+   // platform_error_log("query fp before: %lu\n", fp);
+   // fp >>= 32 - cfg->fingerprint_size;
+   // platform_error_log("fp after shift: %lu\n", fp);
+   uint32_t memento = fp & ((1ULL << 9) - 1);
+   uint64_t found_values_int = 0;
+   page_handle *pages[N_PAGES * 24] = {0};
 
-   for (uint64_t i = 0; i < N_PAGES * 24; i++) {
-      
-      pages[i] = cache_get(cc, filter->addr + i * page_size, TRUE, PAGE_TYPE_FILTER);
+   pages[0] = cache_get(cc, filter->addr, TRUE, PAGE_TYPE_FILTER); 
+   qf_index_page *index = (qf_index_page *)(pages[0]->data); 
+   uint64_t n_filters = 1;
+
+   for (uint64_t i = 1; i < N_PAGES * 24; i++) {
+      if (i % N_PAGES == 0) {
+         if (index->next_filter == 0) {
+            break;
+         }
+         
+         n_filters++;
+         pages[i] = cache_get(cc, index->next_filter, TRUE, PAGE_TYPE_FILTER);
+         index = (qf_index_page *)(pages[i]->data);
+         continue;
+      }
+      uint64_t next_addr = index->page_addrs[(i - 1) % N_PAGES];
+      pages[i] = cache_get(cc, next_addr, TRUE, PAGE_TYPE_FILTER);
+
    }
 
-   for (uint16_t val = 0; val < 24; val++) {
+
+   for (uint16_t val = 0; val < n_filters; val++) {
       QF qf;
 
       qf_use_pages(&qf, pages + (N_PAGES * val));
 
+      // TODO: LOCK
+      platform_error_log("query: { fp, memento } = { %lu, %lu }\n", fp, memento);
       int found = qf_point_query(&qf, fp, memento, QF_NO_LOCK | QF_KEY_IS_HASH);
 
-      if (found != 0)
+      //possibly reverse this
+      if (found != 0) { // **ISSUE: found == 0
          found_values_int |= (1UL << val);
+         // found_values_int |= (1UL << (n_filters - 1 - val));
+      }
    }
 
-   for (uint64_t i = 0; i < N_PAGES * 24; i++) {
+   for (uint64_t i = 0; i < N_PAGES * n_filters; i++) {
       cache_unget(cc, pages[i]);
    }
 

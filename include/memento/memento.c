@@ -2502,7 +2502,8 @@ uint64_t qf_init_pages(QF *qf, uint64_t nslots, uint64_t key_bits,
 uint64_t qf_use_pages(QF* qf, page_handle **pages)
 {
 
-    qf->metadata = (qfmetadata *) (pages[0]->data);
+    qf_index_page *index = (qf_index_page *)(pages[0]->data);
+    qf->metadata = (qfmetadata *) (index + 1);
     qf->runtimedata = (qfruntime *) (qf->metadata + 1);
 	qf->pages = (pages + 1);
 	// if (qf->metadata->total_size_in_bytes + sizeof(qfmetadata) > buffer_len) {
