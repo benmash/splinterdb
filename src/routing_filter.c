@@ -532,8 +532,8 @@ routing_filter_add(cache                  *cc,
    for (i = 0; i < num_new_fp; i++) {
       // insert singles rather than sort + batch insert
       uint64_t memento = new_fp_arr[i] & ((1ULL << 9) - 1);
-      platform_error_log("add: { fp, memento } = { %lu, %lu }\n", new_fp_arr[i], memento);
-      qf_insert_single(&qf, new_fp_arr[i], memento, QF_NO_LOCK | QF_KEY_IS_HASH);
+      // platform_error_log("add: { fp, memento } = { %lu, %lu }\n", new_fp_arr[i], memento);
+      qf_insert_single(&qf, new_fp_arr[i], memento, QF_WAIT_FOR_LOCK | QF_KEY_IS_HASH);
       // platform_error_log("added: {%u, %lu}\n", new_fp_arr[i], memento);
    }
    
@@ -994,8 +994,8 @@ routing_filter_lookup(cache          *cc,
       qf_use_pages(&qf, pages + (N_PAGES * val));
 
       // TODO: LOCK
-      platform_error_log("query: { fp, memento } = { %lu, %lu }\n", fp, memento);
-      int found = qf_point_query(&qf, fp, memento, QF_NO_LOCK | QF_KEY_IS_HASH);
+      // platform_error_log("query: { fp, memento } = { %lu, %lu }\n", fp, memento);
+      int found = qf_point_query(&qf, fp, memento, QF_WAIT_FOR_LOCK | QF_KEY_IS_HASH);
 
       //possibly reverse this
       if (found != 0) { // **ISSUE: found == 0

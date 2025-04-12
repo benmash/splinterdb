@@ -2891,8 +2891,9 @@ int64_t qf_insert_single(QF *qf, uint64_t key, uint64_t memento, uint8_t flags) 
             // Matching sorted list with a complete fingerprint target 
             res = add_memento_to_sorted_list(qf, hash_bucket_index, insert_index,
                                                                         memento);
-            if (res < 0)
+            if (res < 0) {
                 return res;
+            }
             res = insert_index - hash_bucket_index;
         }
         else {
