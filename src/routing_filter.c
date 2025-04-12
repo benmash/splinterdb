@@ -454,8 +454,8 @@ routing_filter_add(cache                  *cc,
       // index_page[0] = cache_alloc(cc, index_addr, PAGE_TYPE_FILTER); // get a
       // pointer to the page in memory
 
-      platform_error_log("before alloc, old_filter->addr = %lu\n",
-                         old_filter->addr);
+      // platform_error_log("before alloc, old_filter->addr = %lu\n",
+      //                    old_filter->addr);
 
    page_handle *pages[N_PAGES * 24];
    // platform_assert(filter->addr == 0 || old_filter->addr != filter->addr);
@@ -518,7 +518,7 @@ routing_filter_add(cache                  *cc,
    
    
    filter->addr = pages[0]->disk_addr;
-   platform_error_log("filter->addr = %lu old_filter->addr = %lu\n", filter->addr, old_filter->addr);
+   // platform_error_log("filter->addr = %lu old_filter->addr = %lu\n", filter->addr, old_filter->addr);
 
    QF qf;
    // give up 3 bits for metadata (32 -> 29), need minimum 18 for canonical slot/index -> 11 bits left -> 2 for fingerprint, 9 for memento
@@ -751,6 +751,7 @@ routing_filter_add(cache                  *cc,
    return STATUS_OK;
 }
 
+//TODO: Make this actually work
 void
 routing_filter_prefetch(cache          *cc,
                         routing_config *cfg,
@@ -802,6 +803,34 @@ routing_filter_estimate_unique_fp(cache           *cc,
                                   routing_filter  *filter,
                                   uint64           num_filters)
 {
+   // TODO: bad (i.e. digshot)
+
+   if (filter->addr == 0) {
+      return 0;
+   }
+
+   uint64_t total = 0;
+   page_handle *filter_page;
+   uint64_t next_addr = filter->addr;
+   for (uint64_t n = 0; n < num_filters; n++) {
+      filter_page = cache_get(cc, next_addr, TRUE, PAGE_TYPE_FILTER);
+      qf_index_page *index = (qf_index_page *) filter_page->data;
+      qfmetadata *meta = (qfmetadata *) (index+1);
+      
+      total += meta->nelts;
+
+      if (index->next_filter == 0) {
+         cache_unget(cc, filter_page);
+         return total;
+      }
+
+      next_addr = index->next_filter;
+      cache_unget(cc, filter_page);
+   }
+
+   return total;
+   
+   /*
    uint32 total_num_fp = 0;
    for (uint64 i = 0; i != num_filters; i++) {
       total_num_fp += filter[i].num_fingerprints;
@@ -924,6 +953,7 @@ routing_filter_estimate_unique_fp(cache           *cc,
 
    platform_free(hid, local);
    return num_unique * 16;
+   */
 }
 
 /*
@@ -951,7 +981,7 @@ routing_filter_lookup(cache          *cc,
       return STATUS_OK;
    }
 
-   platform_error_log("lookup filter->addr = %lu\n", filter->addr);
+   // platform_error_log("lookup filter->addr = %lu\n", filter->addr);
 
    hash_fn   hash       = cfg->hash;
    uint64_t  seed       = cfg->seed;
@@ -1339,6 +1369,8 @@ routing_filter_lookup_async(cache              *cc,
 void
 routing_filter_zap(cache *cc, routing_filter *filter)
 {
+   // platform_error_log("electrify!!\n");
+   
    if (filter->num_fingerprints == 0) {
       return;
    }

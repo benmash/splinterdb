@@ -2814,7 +2814,7 @@ int qf_insert_mementos(QF *qf, uint64_t key, uint64_t mementos[], uint64_t memen
 
 int64_t qf_insert_single(QF *qf, uint64_t key, uint64_t memento, uint8_t flags)     // NEW IN MEMENTO
 {
-// #ifdef DEBUG
+#ifdef DEBUG
     uint64_t occupied_cnt = 0, runend_cnt = 0;
     for (uint32_t i = 0; i < qf->metadata->nblocks; i++) {
         occupied_cnt += popcnt(get_block(qf, i)->occupieds[0]);
@@ -2823,7 +2823,7 @@ int64_t qf_insert_single(QF *qf, uint64_t key, uint64_t memento, uint8_t flags) 
     }
     // printf("key: %lu, memento: %lu ; { occupied_cnt, runend_cnt }: { %lu, %lu }\n", key, memento, occupied_cnt, runend_cnt);
     assert(occupied_cnt == runend_cnt);
-//#endif /* DEBUG */
+#endif /* DEBUG */
 	// We fill up the CQF up to 95% load factor.
 	// This is a very conservative check.
     if (qf->metadata->noccupied_slots >= qf->metadata->nslots * 0.95
