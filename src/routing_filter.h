@@ -117,12 +117,12 @@
                        key             target,
                        uint64         *found_values);
 platform_status
-routing_filter_range_lookup(cache          *cc,
-                             routing_config *cfg,
-                             routing_filter *filter,
-                             key             start,
-                             key             end,
-                             uint64         *found_values);
+routing_filter_lookup_range(cache          *cc,
+                            routing_config *cfg,
+                            routing_filter *filter,
+                            key             min,
+                            key             max,
+                            uint64         *found_values);
  
  static inline uint16
  routing_filter_get_next_value(uint64 found_values, uint16 last_value)

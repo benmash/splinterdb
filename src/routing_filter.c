@@ -1104,6 +1104,98 @@ routing_filter_lookup(cache          *cc,
    
 }
 
+
+/*
+ *----------------------------------------------------------------------
+ * routing_filter_lookup
+ *
+ *      Looks for range in the filter and returns whether it was found, it's
+ *      value goes in found_values.
+ *
+ *      IMPORTANT: If there are multiple matching values, this function returns
+ *      them in the reverse order.
+ *----------------------------------------------------------------------
+ */
+platform_status
+routing_filter_lookup_range(cache          *cc,
+                            routing_config *cfg,
+                            routing_filter *filter,
+                            key             min,
+                            key             max,
+                            uint64         *found_values)
+{
+   debug_assert(key_is_user_key(min));
+   debug_assert(key_is_user_key(max));
+
+   if (filter->addr == 0) {
+      *found_values = 0;
+      return STATUS_OK;
+   }
+
+   // platform_error_log("lookup filter->addr = %lu\n", filter->addr);
+
+   hash_fn   hash       = cfg->hash;
+   uint64_t  seed       = cfg->seed;
+   uint64_t  index_size = cfg->index_size;
+   uint64_t  page_size  = cache_config_page_size(cfg->cache_cfg);
+
+   uint32_t min_fp = hash(key_data(min), key_length(min), seed);
+   uint32_t max_fp = hash(key_data(max), key_length(max), seed);
+   
+   // platform_error_log("query fp before: %lu\n", fp);
+   // fp >>= 32 - cfg->fingerprint_size;
+   // platform_error_log("fp after shift: %lu\n", fp);
+   uint32_t min_memento = min_fp & ((1ULL << 9) - 1);
+   uint32_t max_memento = max_fp & ((1ULL << 9) - 1);
+   uint64_t found_values_int = 0;
+   page_handle *pages[N_PAGES * 24] = {0};
+
+   pages[0] = cache_get(cc, filter->addr, TRUE, PAGE_TYPE_FILTER); 
+   qf_index_page *index = (qf_index_page *)(pages[0]->data); 
+   uint64_t n_filters = 1;
+
+   for (uint64_t i = 1; i < N_PAGES * 24; i++) {
+      if (i % N_PAGES == 0) {
+         if (index->next_filter == 0) {
+            break;
+         }
+         
+         n_filters++;
+         pages[i] = cache_get(cc, index->next_filter, TRUE, PAGE_TYPE_FILTER);
+         index = (qf_index_page *)(pages[i]->data);
+         continue;
+      }
+      uint64_t next_addr = index->page_addrs[(i - 1) % N_PAGES];
+      pages[i] = cache_get(cc, next_addr, TRUE, PAGE_TYPE_FILTER);
+
+   }
+
+
+   for (uint16_t val = 0; val < n_filters; val++) {
+      QF qf;
+
+      qf_use_pages(&qf, pages + (N_PAGES * val));
+
+      // TODO: LOCK
+      // platform_error_log("query: { fp, memento } = { %lu, %lu }\n", fp, memento);
+      // int found = qf_point_query(&qf, fp, memento, QF_WAIT_FOR_LOCK | QF_KEY_IS_HASH);
+      int found = qf_range_query(&qf, min_fp, min_memento, max_fp, max_memento, QF_WAIT_FOR_LOCK | QF_KEY_IS_HASH);
+
+      //possibly reverse this
+      if (found != 0) { // **ISSUE: found == 0
+         found_values_int |= (1UL << val);
+         // found_values_int |= (1UL << (n_filters - 1 - val));
+      }
+   }
+
+   for (uint64_t i = 0; i < N_PAGES * n_filters; i++) {
+      cache_unget(cc, pages[i]);
+   }
+
+   *found_values = found_values_int;
+   return STATUS_OK;
+}
+
 /*
  *-----------------------------------------------------------------------------
  * routing_async_set_state --

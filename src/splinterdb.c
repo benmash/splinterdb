@@ -663,6 +663,40 @@ struct splinterdb_iterator {
 };
 
 int
+splinterdb_range_query(const splinterdb     *kvs,        // IN
+                       splinterdb_iterator **iter,       // OUT
+                       slice                 start_key,  // IN
+                       slice                 end_key     // IN
+)
+{
+   // splinterdb_iterator *it = TYPED_MALLOC(kvs->spl->heap_id, it);
+   // if (it == NULL) {
+   //    platform_error_log("TYPED_MALLOC error\n");
+   //    return platform_status_to_int(STATUS_NO_MEMORY);
+   // }
+   // it->last_rc = STATUS_OK;
+
+   // trunk_range_iterator *range_itor = &(it->sri);
+
+   splinterdb_lookup_result r;
+   splinterdb_lookup_result_init(kvs, &r, 0, NULL);
+   _splinterdb_lookup_result *_r     = (_splinterdb_lookup_result *) &r;
+   merge_accumulator         *result = &_r->value;
+
+
+   platform_error_log("range_range\n");
+   bool32 nonempty_range = do_range_query(kvs->spl, key_create_from_slice(start_key), key_create_from_slice(end_key), result);
+
+   if (nonempty_range) {
+      return splinterdb_iterator_init(kvs, iter, start_key);
+   } else {
+      return splinterdb_iterator_init(kvs, iter, end_key);
+   }
+
+}
+
+
+int
 splinterdb_iterator_init(const splinterdb     *kvs,           // IN
                          splinterdb_iterator **iter,          // OUT
                          slice                 user_start_key // IN
@@ -684,6 +718,7 @@ splinterdb_iterator_init(const splinterdb     *kvs,           // IN
       start_key = key_create_from_slice(user_start_key);
    }
 
+   // trunk_range_iterator_init
    platform_status rc = trunk_range_iterator_init(kvs->spl,
                                                   range_itor,
                                                   NEGATIVE_INFINITY_KEY,

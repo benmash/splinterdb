@@ -339,6 +339,9 @@ typedef struct trunk_async_ctxt {
 platform_status
 trunk_insert(trunk_handle *spl, key tuple_key, message data);
 
+bool32
+do_range_query(trunk_handle *spl, key start_key, key end_key, merge_accumulator *result);
+
 platform_status
 trunk_lookup(trunk_handle *spl, key target, merge_accumulator *result);
 
@@ -361,6 +364,16 @@ trunk_range_iterator_init(trunk_handle         *spl,
                           key                   start_key,
                           comparison            start_type,
                           uint64                num_tuples);
+
+platform_status
+trunk_range_range_filter_iterator_init(trunk_handle         *spl,
+                                       trunk_range_iterator *range_itor,
+                                       key                   min_key,
+                                       key                   max_key,
+                                       key                   start_key,
+                                       comparison            start_type,
+                                       uint64                num_tuples);
+
 void
 trunk_range_iterator_deinit(trunk_range_iterator *range_itor);
 
