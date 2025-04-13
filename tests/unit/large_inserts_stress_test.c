@@ -186,8 +186,8 @@ CTEST2_SKIP(large_inserts_stress,
          snprintf(key_data, sizeof(key_data), "%lu", id);
          snprintf(val_data, sizeof(val_data), "Row-%lu", id);
 
-         slice key = slice_create(strlen(key_data), key_data);
-         slice val = slice_create(strlen(val_data), val_data);
+         slice key = slice_create_test(strlen(key_data), key_data);
+         slice val = slice_create_test(strlen(val_data), val_data);
 
          int rc = splinterdb_insert(data->kvsb, key, val);
          ASSERT_EQUAL(0, rc);
@@ -712,8 +712,8 @@ exec_worker_thread(void *w)
             }
          }
 
-         slice key = slice_create(key_len, key_data);
-         slice val = slice_create(val_len, val_data);
+         slice key = slice_create_test(key_len, key_data);
+         slice val = slice_create_test(val_len, val_data);
 
          int rc = splinterdb_insert(kvsb, key, val);
          ASSERT_EQUAL(0, rc);

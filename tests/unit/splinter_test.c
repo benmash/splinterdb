@@ -324,7 +324,7 @@ shadow_entry_value(const shadow_entry *entry, char *data)
 {
    return message_create(
       MESSAGE_TYPE_INSERT,
-      slice_create(entry->value_length,
+      slice_create_test(entry->value_length,
                    data + entry->key_offset + entry->key_length));
 }
 

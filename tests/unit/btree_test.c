@@ -195,7 +195,7 @@ leaf_hdr_tests(btree_config *cfg, btree_scratch *scratch, platform_heap_id hid)
          hdr,
          i,
          key_create(i % sizeof(i), &i),
-         message_create(MESSAGE_TYPE_INSERT, slice_create(i % sizeof(i), &i)));
+         message_create(MESSAGE_TYPE_INSERT, slice_create_test(i % sizeof(i), &i)));
       ASSERT_TRUE(rv, "Failed to insert 4-byte %d\n", i);
    }
 
@@ -208,7 +208,7 @@ leaf_hdr_tests(btree_config *cfg, btree_scratch *scratch, platform_heap_id hid)
       ASSERT_EQUAL(0, cmp_rv, "Bad 4-byte key %d\n", i);
 
       cmp_rv = message_lex_cmp(
-         message_create(MESSAGE_TYPE_INSERT, slice_create(i % sizeof(i), &i)),
+         message_create(MESSAGE_TYPE_INSERT, slice_create_test(i % sizeof(i), &i)),
          msg);
       ASSERT_EQUAL(0, cmp_rv, "Bad 4-byte message %d\n", i);
    }
@@ -220,7 +220,7 @@ leaf_hdr_tests(btree_config *cfg, btree_scratch *scratch, platform_heap_id hid)
          hdr,
          i,
          key_create(i % sizeof(i), &i),
-         message_create(MESSAGE_TYPE_INSERT, slice_create(i % sizeof(i), &i)));
+         message_create(MESSAGE_TYPE_INSERT, slice_create_test(i % sizeof(i), &i)));
       ASSERT_TRUE(rv, "Failed to insert 8-byte %ld\n", i);
    }
 
@@ -233,7 +233,7 @@ leaf_hdr_tests(btree_config *cfg, btree_scratch *scratch, platform_heap_id hid)
       ASSERT_EQUAL(0, cmp_rv, "Bad 4-byte key %d\n", i);
 
       cmp_rv = message_lex_cmp(
-         message_create(MESSAGE_TYPE_INSERT, slice_create(i % sizeof(i), &i)),
+         message_create(MESSAGE_TYPE_INSERT, slice_create_test(i % sizeof(i), &i)),
          msg);
       ASSERT_EQUAL(0, cmp_rv, "Bad 4-byte message %d\n", i);
    }
@@ -249,7 +249,7 @@ leaf_hdr_tests(btree_config *cfg, btree_scratch *scratch, platform_heap_id hid)
       ASSERT_EQUAL(0, cmp_rv, "Bad 4-byte key %d\n", i);
 
       cmp_rv = message_lex_cmp(
-         message_create(MESSAGE_TYPE_INSERT, slice_create(i % sizeof(i), &i)),
+         message_create(MESSAGE_TYPE_INSERT, slice_create_test(i % sizeof(i), &i)),
          msg);
       ASSERT_EQUAL(0, cmp_rv, "Bad 4-byte message %d\n", i);
    }
@@ -277,7 +277,7 @@ leaf_hdr_search_tests(btree_config *cfg, platform_heap_id hid)
 
       key     tuple_key = key_create(1, &keybuf);
       message msg =
-         message_create(MESSAGE_TYPE_INSERT, slice_create(i % 8, messagebuf));
+         message_create(MESSAGE_TYPE_INSERT, slice_create_test(i % 8, messagebuf));
 
       leaf_incorporate_spec spec;
       bool32                result = btree_leaf_incorporate_tuple(
@@ -416,10 +416,10 @@ leaf_split_tests(btree_config    *cfg,
 
    int     msgsize = bt_page_size / (nkvs + 1);
    message msg =
-      message_create(MESSAGE_TYPE_INSERT, slice_create(msgsize, msg_buffer));
+      message_create(MESSAGE_TYPE_INSERT, slice_create_test(msgsize, msg_buffer));
    message bigger_msg = message_create(
       MESSAGE_TYPE_INSERT,
-      slice_create(msgsize + sizeof(table_entry) + 1, msg_buffer));
+      slice_create_test(msgsize + sizeof(table_entry) + 1, msg_buffer));
 
    uint8 realnkvs = 0;
    while (realnkvs < nkvs) {

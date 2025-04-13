@@ -283,7 +283,7 @@ CTEST2(writable_buffer, test_basic_copy_slice)
    const char *input_str = "Hello World!";
 
    char        buf[WB_ONSTACK_BUFSIZE];
-   const slice src = slice_create(strlen(input_str), (const void *)input_str);
+   const slice src = slice_create_test(strlen(input_str), (const void *)input_str);
 
    writable_buffer_init_with_buffer(wb, data->hid, sizeof(buf), (void *)buf, 0);
    platform_status rc = writable_buffer_copy_slice(wb, src);
@@ -311,7 +311,7 @@ CTEST2(writable_buffer, test_copy_slice_causing_resize_larger)
    const char *input_str = "Hello World!";
 
    char        buf[WB_ONSTACK_BUFSIZE];
-   const slice src = slice_create(strlen(input_str), (const void *)input_str);
+   const slice src = slice_create_test(strlen(input_str), (const void *)input_str);
 
    writable_buffer_init_with_buffer(wb, data->hid, sizeof(buf), (void *)buf, 0);
    platform_status rc = writable_buffer_copy_slice(wb, src);
@@ -328,7 +328,7 @@ CTEST2(writable_buffer, test_copy_slice_causing_resize_larger)
                                " known to exceed original WB_ONSTACK_BUFSIZE";
 
    const slice newsrc =
-      slice_create(strlen(very_long_str), (const void *)very_long_str);
+      slice_create_test(strlen(very_long_str), (const void *)very_long_str);
    rc = writable_buffer_copy_slice(wb, newsrc);
    ASSERT_TRUE(SUCCESS(rc));
 

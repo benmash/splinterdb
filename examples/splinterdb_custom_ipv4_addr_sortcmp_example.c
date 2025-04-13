@@ -314,8 +314,8 @@ do_inserts(splinterdb *spl_handle, kv_pair *kv_pairs, int num_kv_pairs)
    int ictr = 0;
    for (; ictr < num_kv_pairs; ictr++) {
       slice key =
-         slice_create(strlen(kv_pairs[ictr].kv_key), kv_pairs[ictr].kv_key);
-      slice value = slice_create(WWW_PING_SIZE(&kv_pairs[ictr].kv_val),
+         slice_create_test(strlen(kv_pairs[ictr].kv_key), kv_pairs[ictr].kv_key);
+      slice value = slice_create_test(WWW_PING_SIZE(&kv_pairs[ictr].kv_val),
                                  (const char *)&kv_pairs[ictr].kv_val);
       int   rc    = splinterdb_insert(spl_handle, key, value);
       if (rc) {
@@ -344,7 +344,7 @@ do_iterate_from(splinterdb *spl_handle, const char *from_key)
 
    // Initialize start key if initial search key was provided.
    slice start_key =
-      (from_key ? slice_create(strlen(from_key), from_key) : NULL_SLICE);
+      (from_key ? slice_create_test(strlen(from_key), from_key) : NULL_SLICE);
    int rc = splinterdb_iterator_init(spl_handle, &it, start_key);
 
    int i = 0;

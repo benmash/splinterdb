@@ -50,23 +50,23 @@ main()
    // Insert a few kv-pairs, describing properties of fruits.
    const char *fruit = "apple";
    const char *descr = "An apple a day keeps the doctor away!";
-   slice       key   = slice_create((size_t)strlen(fruit), fruit);
-   slice       value = slice_create((size_t)strlen(descr), descr);
+   slice       key   = slice_create_test((size_t)strlen(fruit), fruit);
+   slice       value = slice_create_test((size_t)strlen(descr), descr);
 
    rc = splinterdb_insert(spl_handle, key, value);
    printf("Inserted key '%s'\n", fruit);
 
    fruit = "Orange";
    descr = "Is a good source of vitamin-C.";
-   key   = slice_create((size_t)strlen(fruit), fruit);
-   value = slice_create((size_t)strlen(descr), descr);
+   key   = slice_create_test((size_t)strlen(fruit), fruit);
+   value = slice_create_test((size_t)strlen(descr), descr);
    rc    = splinterdb_insert(spl_handle, key, value);
    printf("Inserted key '%s'\n", fruit);
 
    fruit = "Mango";
    descr = "Mango is the king of fruits.";
-   key   = slice_create((size_t)strlen(fruit), fruit);
-   value = slice_create((size_t)strlen(descr), descr);
+   key   = slice_create_test((size_t)strlen(fruit), fruit);
+   value = slice_create_test((size_t)strlen(descr), descr);
    rc    = splinterdb_insert(spl_handle, key, value);
    printf("Inserted key '%s'\n", fruit);
 
@@ -75,7 +75,7 @@ main()
    splinterdb_lookup_result_init(spl_handle, &result, 0, NULL);
 
    fruit = "Orange";
-   key   = slice_create((size_t)strlen(fruit), fruit);
+   key   = slice_create_test((size_t)strlen(fruit), fruit);
    rc    = splinterdb_lookup(spl_handle, key, &result);
    rc    = splinterdb_lookup_result_value(&result, &value);
    if (!rc) {
@@ -87,7 +87,7 @@ main()
 
    // Handling non-existent keys
    fruit = "Banana";
-   key   = slice_create((size_t)strlen(fruit), fruit);
+   key   = slice_create_test((size_t)strlen(fruit), fruit);
    rc    = splinterdb_lookup(spl_handle, key, &result);
    rc    = splinterdb_lookup_result_value(&result, &value);
    if (rc) {

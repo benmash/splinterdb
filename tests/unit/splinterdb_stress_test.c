@@ -123,8 +123,8 @@ CTEST2(splinterdb_stress, test_naive_range_delete)
       random_bytes(&rand_state, key_buffer, TEST_KEY_SIZE);
       random_bytes(&rand_state, value_buffer, TEST_VALUE_SIZE);
       int rc = splinterdb_insert(data->kvsb,
-                                 slice_create(TEST_KEY_SIZE, key_buffer),
-                                 slice_create(TEST_VALUE_SIZE, value_buffer));
+                                 slice_create_test(TEST_KEY_SIZE, key_buffer),
+                                 slice_create_test(TEST_VALUE_SIZE, value_buffer));
       ASSERT_EQUAL(0, rc);
    }
 
@@ -138,7 +138,7 @@ CTEST2(splinterdb_stress, test_naive_range_delete)
       const uint32 num_to_delete = num_inserts / num_rounds;
 
       naive_range_delete(data->kvsb,
-                         slice_create(sizeof(start_key_data), start_key_data),
+                         slice_create_test(sizeof(start_key_data), start_key_data),
                          num_to_delete);
    }
 }
@@ -155,15 +155,15 @@ CTEST2(splinterdb_stress, test_iterator_over_many_kvs)
    const uint32 inserts   = 1 << 25; // 16 million
    for (int i = 0; i < inserts; i++) {
       snprintf(key_str, sizeof(key_str), "key-%08x", i);
-      slice key = slice_create(sizeof(key_str), key_str);
-      slice val = slice_create(sizeof(value_str), value_str);
+      slice key = slice_create_test(sizeof(key_str), key_str);
+      slice val = slice_create_test(sizeof(value_str), value_str);
       ASSERT_EQUAL(0, splinterdb_insert(data->kvsb, key, val));
    }
 
    // create an iterator at end of keys
    splinterdb_iterator *it = NULL;
    snprintf(key_str, sizeof(key_str), "key-%08x", inserts);
-   slice start_key = slice_create(sizeof(key_str), key_str);
+   slice start_key = slice_create_test(sizeof(key_str), key_str);
    ASSERT_EQUAL(0, splinterdb_iterator_init(data->kvsb, &it, start_key));
 
    // assert that the iterator is in the state we expect
@@ -243,8 +243,8 @@ CTEST2_SKIP(splinterdb_stress, test_issue_458_mini_destroy_unused_debug_assert)
          snprintf(key_data, sizeof(key_data), "%lu", id);
          snprintf(val_data, sizeof(val_data), "Row-%lu", id);
 
-         slice key = slice_create(strlen(key_data), key_data);
-         slice val = slice_create(strlen(val_data), val_data);
+         slice key = slice_create_test(strlen(key_data), key_data);
+         slice val = slice_create_test(strlen(val_data), val_data);
 
          int rc = splinterdb_insert(data->kvsb, key, val);
          ASSERT_EQUAL(0, rc);
@@ -299,8 +299,8 @@ exec_worker_thread(void *w)
       ASSERT_TRUE(result >= 0);
 
       rc = splinterdb_insert(kvsb,
-                             slice_create(TEST_KEY_SIZE, key_buf),
-                             slice_create(TEST_VALUE_SIZE, value_buf));
+                             slice_create_test(TEST_KEY_SIZE, key_buf),
+                             slice_create_test(TEST_VALUE_SIZE, value_buf));
       ASSERT_EQUAL(0, rc);
 
       if (i && (i % 100000 == 0)) {
@@ -346,7 +346,7 @@ naive_range_delete(const splinterdb *kvsb, slice start_key, uint32 count)
    CTEST_LOG_INFO("\tdeleting collected keys...\n");
    for (uint32 i = 0; i < num_found; i++) {
       slice key_to_delete =
-         slice_create(TEST_KEY_SIZE, keys_to_delete + i * TEST_KEY_SIZE);
+         slice_create_test(TEST_KEY_SIZE, keys_to_delete + i * TEST_KEY_SIZE);
       splinterdb_delete(kvsb, key_to_delete);
    }
 

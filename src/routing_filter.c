@@ -334,6 +334,7 @@ routing_filter_add(cache                  *cc,
                    uint64                  num_new_fp,
                    uint16                  value)
 {
+   platform_error_log("ahsdjfaksdhfskj\n");
    ZERO_CONTENTS(filter);
    // TODO old filter add fingerprints
    
@@ -530,10 +531,12 @@ routing_filter_add(cache                  *cc,
    }
    
    for (i = 0; i < num_new_fp; i++) {
-      // insert singles rather than sort + batch insert
-      uint64_t memento = new_fp_arr[i] & ((1ULL << 9) - 1);
+      // insert singles rather than sort + batch insert // TODO: implement sort + batch insert
+      uint32_t memento = new_fp_arr[i] & ((1ULL << 9) - 1);
+      uint32_t fp = new_fp_arr[i] >> 9;
+      // platform_error_log("{ fp, memento } = { %u, %u }\n", fp, memento);
       // platform_error_log("add: { fp, memento } = { %lu, %lu }\n", new_fp_arr[i], memento);
-      qf_insert_single(&qf, new_fp_arr[i], memento, QF_WAIT_FOR_LOCK | QF_KEY_IS_HASH);
+      qf_insert_single(&qf, fp, memento, QF_WAIT_FOR_LOCK | QF_KEY_IS_HASH);
       // platform_error_log("added: {%u, %lu}\n", new_fp_arr[i], memento);
    }
    
@@ -803,8 +806,6 @@ routing_filter_estimate_unique_fp(cache           *cc,
                                   routing_filter  *filter,
                                   uint64           num_filters)
 {
-   // TODO: bad (i.e. digshot)
-
    if (filter->addr == 0) {
       return 0;
    }
@@ -994,6 +995,8 @@ routing_filter_lookup(cache          *cc,
    // fp >>= 32 - cfg->fingerprint_size;
    // platform_error_log("fp after shift: %lu\n", fp);
    uint32_t memento = fp & ((1ULL << 9) - 1);
+   fp >>= 9;
+   // platform_error_log("{ fp, memento } = { %u, %u }\n", fp, memento);
    uint64_t found_values_int = 0;
    page_handle *pages[N_PAGES * 24] = {0};
 

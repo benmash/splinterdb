@@ -60,8 +60,8 @@ main()
       snprintf(key_buf, sizeof(key_buf), "Key with val_len=%d", val_len);
       memset(val_buf, 'z', val_len);
 
-      slice key   = slice_create(strlen(key_buf), key_buf);
-      slice value = slice_create(val_len, val_buf);
+      slice key   = slice_create_test(strlen(key_buf), key_buf);
+      slice value = slice_create_test(val_len, val_buf);
       rc          = splinterdb_insert(spl_handle, key, value);
       if (rc) {
          break;
@@ -91,7 +91,7 @@ main()
       snprintf(key_buf, sizeof(key_buf), "Key with val_len=%d", val_len);
       size_t key_len = strlen(key_buf);
 
-      slice key = slice_create(key_len, key_buf);
+      slice key = slice_create_test(key_len, key_buf);
       rc        = splinterdb_lookup(spl_handle, key, &result);
 
       slice value;

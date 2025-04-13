@@ -3149,10 +3149,22 @@ btree_pack_create_next_node(btree_pack_req *req, uint64 height, key pivot)
    return &req->edge[height][req->num_edges[height] - 1];
 }
 
+static inline uint64_t
+key_to_int(key k)
+{
+   platform_assert(key_is_user_key(k));
+      // assume int keys for range queries
+   platform_assert(key_length(k) == sizeof(uint64_t));
+
+   uint64_t num = *(uint64_t *)key_data(k);
+   
+   return num;
+}
+
 static inline platform_status
 btree_pack_loop(btree_pack_req *req,       // IN/OUT
                 key             tuple_key, // IN
-                message         msg)               // IN
+                message         msg)       // IN
 {
    log_trace_key(tuple_key, "btree_pack_loop");
 
@@ -3181,8 +3193,14 @@ btree_pack_loop(btree_pack_req *req,       // IN/OUT
 
    if (req->hash) {
       platform_assert(req->num_tuples < req->max_tuples);
-      req->fingerprint_arr[req->num_tuples] =
-         req->hash(key_data(tuple_key), key_length(tuple_key), req->seed);
+
+      uint32 fp = req->hash(key_data(tuple_key), key_length(tuple_key), req->seed);
+      // MEMENTO_BITS
+      fp <<= 9;
+      fp |= key_to_int(tuple_key) & ((1ULL << 9) - 1);
+
+      req->fingerprint_arr[req->num_tuples] = fp;
+         
    }
 
    req->num_tuples++;

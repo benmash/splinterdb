@@ -255,17 +255,17 @@ CTEST2(splinterdb_forked_child, test_one_insert_then_close_bug)
 
       // Basic insert of new key should succeed.
       key_len   = snprintf(key_data, sizeof(key_data), "%d", 1);
-      slice key = slice_create(key_len, key_data);
+      slice key = slice_create_test(key_len, key_data);
 
       static char *to_insert_data = "some-value";
       size_t       to_insert_len  = strlen(to_insert_data);
-      slice        to_insert      = slice_create(to_insert_len, to_insert_data);
+      slice        to_insert      = slice_create_test(to_insert_len, to_insert_data);
 
       rc = splinterdb_insert(spl_handle, key, to_insert);
       ASSERT_EQUAL(0, rc);
 
       key_len = snprintf(key_data, sizeof(key_data), "%d", 2);
-      key     = slice_create(key_len, key_data);
+      key     = slice_create_test(key_len, key_data);
       rc      = splinterdb_insert(spl_handle, key, to_insert);
       ASSERT_EQUAL(0, rc);
 
@@ -612,8 +612,8 @@ do_many_inserts(splinterdb *kvsb, uint64 num_inserts)
          snprintf(key_data, sizeof(key_data), "%lu", id);
          uint64 key_len = strlen(key_data);
 
-         slice key = slice_create(key_len, key_data);
-         slice val = slice_create(val_len, val_data);
+         slice key = slice_create_test(key_len, key_data);
+         slice val = slice_create_test(val_len, val_data);
 
          int rc = splinterdb_insert(kvsb, key, val);
          ASSERT_EQUAL(0, rc);

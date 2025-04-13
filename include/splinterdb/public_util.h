@@ -4,6 +4,8 @@
 #pragma once
 
 #include "splinterdb/public_platform.h"
+#include "xxhash.h"
+#include <stdlib.h>
 
 /*
  * A slice is just a const pointer with a length.  Slices do not
@@ -37,6 +39,14 @@ static inline slice
 slice_create(uint64 len, const void *data)
 {
    return (slice){.length = len, .data = data};
+}
+
+static inline slice
+slice_create_test(uint64 len, const void *data) {
+   uint64_t hash = (uint64_t) XXH64(data, len, 0);
+   uint64_t *mem = malloc(sizeof(uint64_t));
+   *mem = hash;
+   return (slice){.length = sizeof(uint64_t), .data = (void *) mem};
 }
 
 static inline uint64
