@@ -3181,8 +3181,18 @@ btree_pack_loop(btree_pack_req *req,       // IN/OUT
 
    if (req->hash) {
       platform_assert(req->num_tuples < req->max_tuples);
-      req->fingerprint_arr[req->num_tuples] =
-         req->hash(key_data(tuple_key), key_length(tuple_key), req->seed);
+      // req->fingerprint_arr[req->num_tuples] =
+      //    req->hash(key_data(tuple_key), key_length(tuple_key), req->seed);
+
+      uint32 fp = req->hash(key_data(tuple_key), key_length(tuple_key), req->seed);
+
+      fp <<= 9;
+
+      uint32 memento = (*(uint64_t *)key_data(tuple_key)) & ((1UL << 9) - 1);
+
+      fp |= memento;
+
+      req->fingerprint_arr[req->num_tuples] = fp;      
    }
 
    req->num_tuples++;

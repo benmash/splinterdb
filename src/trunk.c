@@ -6393,19 +6393,7 @@ trunk_range_iterator_init(trunk_handle         *spl,
    return rc;
 }
 
-platform_status
-trunk_range_range_filter_iterator_init(trunk_handle         *spl,
-                                       trunk_range_iterator *range_itor,
-                                       key                   min_key,
-                                       key                   max_key,
-                                       key                   start_key,
-                                       comparison            start_type,
-                                       uint64                num_tuples)
-{
-   debug_assert(!key_is_null(min_key));
-   debug_assert(!key_is_null(max_key));
-   debug_assert(!key_is_null(start_key));
-}
+
 // platform_status
 // trunk_range_range_filter_iterator_init(trunk_handle         *spl,
 //                                        trunk_range_iterator *range_itor,
@@ -7285,28 +7273,6 @@ key_to_int(key k)
    return num;
 }
 
-
-bool32
-do_range_query(trunk_handle *spl, key start_key, key end_key, merge_accumulator *result)
-{
-   platform_error_log("doing range query\n");
-
-   bool32 in_memptable = entry_scan(spl, start_key, end_key, result);
-
-   if (in_memptable) {
-      return TRUE;
-   }
-
-   trunk_node node;
-   trunk_root_get(spl, &node);
-
-   bool32 in_trunk = traverse_trunk(spl, &node, start_key, end_key);
-
-   trunk_node_unget(spl->cc, &node);
-
-   return in_trunk;
-}
-
 bool32
 entry_scan(trunk_handle *spl, key start_key, key end_key, merge_accumulator *result)
 {
@@ -7385,12 +7351,12 @@ traverse_trunk(trunk_handle *spl, trunk_node *node, key start, key end)
    }
 
    
-   uint16 pivot_no_start = trunk_find_pivot(spl, &node, start, greater_than_or_equal);
-   uint16 pivot_no_end = trunk_find_pivot(spl, &node, end, less_than_or_equal);
-   debug_assert(pivot_no_end <= trunk_num_children(spl, &node));
+   uint16 pivot_no_start = trunk_find_pivot(spl, node, start, greater_than_or_equal);
+   uint16 pivot_no_end = trunk_find_pivot(spl, node, end, less_than_or_equal);
+   debug_assert(pivot_no_end <= trunk_num_children(spl, node));
 
    for (uint16 pivot_no = pivot_no_start; pivot_no <= pivot_no_end; pivot_no++) {
-      trunk_pivot_data *pdata = trunk_get_pivot_data(spl, &node, pivot_no);
+      trunk_pivot_data *pdata = trunk_get_pivot_data(spl, node, pivot_no);
          
       trunk_node child;
       trunk_node_get(spl->cc, pdata->addr, &child);
@@ -7403,7 +7369,31 @@ traverse_trunk(trunk_handle *spl, trunk_node *node, key start, key end)
          return TRUE;
       }
    }
+   return FALSE;
 }
+
+bool32
+do_range_query(trunk_handle *spl, key start_key, key end_key, merge_accumulator *result)
+{
+   platform_error_log("doing range query\n");
+
+   bool32 in_memptable = entry_scan(spl, start_key, end_key, result);
+
+   if (in_memptable) {
+      return TRUE;
+   }
+
+   trunk_node node;
+   trunk_root_get(spl, &node);
+
+   bool32 in_trunk = traverse_trunk(spl, &node, start_key, end_key);
+
+   trunk_node_unget(spl->cc, &node);
+
+   return in_trunk;
+}
+
+
 
 // If any change is made in here, please make similar change in
 // trunk_lookup_async

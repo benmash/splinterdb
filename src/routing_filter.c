@@ -530,10 +530,14 @@ routing_filter_add(cache                  *cc,
    }
    
    for (i = 0; i < num_new_fp; i++) {
-      // insert singles rather than sort + batch insert
-      uint64_t memento = new_fp_arr[i] & ((1ULL << 9) - 1);
+      // insert singles rather than sort + batch insert // TODO: sort + batch insert
+
+      uint32_t memento = new_fp_arr[i] & ((1ULL << 9) - 1);
+
+      uint32_t fp = new_fp_arr[i] >> 9;
+
       // platform_error_log("add: { fp, memento } = { %lu, %lu }\n", new_fp_arr[i], memento);
-      qf_insert_single(&qf, new_fp_arr[i], memento, QF_WAIT_FOR_LOCK | QF_KEY_IS_HASH);
+      qf_insert_single(&qf, fp, memento, QF_WAIT_FOR_LOCK | QF_KEY_IS_HASH);
       // platform_error_log("added: {%u, %lu}\n", new_fp_arr[i], memento);
    }
    
@@ -988,12 +992,17 @@ routing_filter_lookup(cache          *cc,
    uint64_t  index_size = cfg->index_size;
    uint64_t  page_size  = cache_config_page_size(cfg->cache_cfg);
 
-   uint32_t fp = hash(key_data(target), key_length(target), seed);
+   uint32_t fp = hash(key_data(target), key_length(target), seed) << 9;
    
+   fp >>= 9;
+
    // platform_error_log("query fp before: %lu\n", fp);
    // fp >>= 32 - cfg->fingerprint_size;
    // platform_error_log("fp after shift: %lu\n", fp);
-   uint32_t memento = fp & ((1ULL << 9) - 1);
+   // uint32_t memento = fp & ((1ULL << 9) - 1);
+
+   uint32 memento = (*(uint64_t *)key_data(target)) & ((1UL << 9) - 1);
+
    uint64_t found_values_int = 0;
    page_handle *pages[N_PAGES * 24] = {0};
 

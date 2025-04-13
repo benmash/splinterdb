@@ -718,7 +718,6 @@ splinterdb_iterator_init(const splinterdb     *kvs,           // IN
       start_key = key_create_from_slice(user_start_key);
    }
 
-   // trunk_range_iterator_init
    platform_status rc = trunk_range_iterator_init(kvs->spl,
                                                   range_itor,
                                                   NEGATIVE_INFINITY_KEY,

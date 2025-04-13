@@ -39,6 +39,7 @@ slice_create(uint64 len, const void *data)
    return (slice){.length = len, .data = data};
 }
 
+
 static inline uint64
 slice_length(const slice b)
 {
