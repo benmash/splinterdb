@@ -334,7 +334,15 @@ Sample application code:
    splinterdb_iterator_deinit(it);
 */
 
+
 typedef struct splinterdb_iterator splinterdb_iterator;
+
+int
+splinterdb_range_query(const splinterdb     *kvs,        // IN
+                       splinterdb_iterator **iter,       // OUT
+                       slice                 start_key,  // IN
+                       slice                 end_key     // IN
+);
 
 // Initialize a new iterator, starting at the given key
 //

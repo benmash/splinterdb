@@ -536,6 +536,8 @@ routing_filter_add(cache                  *cc,
 
       uint32_t fp = new_fp_arr[i] >> 9;
 
+      platform_error_log("filter { fp, memento }: { %u, %u }\n", fp, memento);
+
       // platform_error_log("add: { fp, memento } = { %lu, %lu }\n", new_fp_arr[i], memento);
       qf_insert_single(&qf, fp, memento, QF_WAIT_FOR_LOCK | QF_KEY_IS_HASH);
       // platform_error_log("added: {%u, %lu}\n", new_fp_arr[i], memento);
@@ -1001,7 +1003,7 @@ routing_filter_lookup(cache          *cc,
    // platform_error_log("fp after shift: %lu\n", fp);
    // uint32_t memento = fp & ((1ULL << 9) - 1);
 
-   uint32 memento = (*(uint64_t *)key_data(target)) & ((1UL << 9) - 1);
+   uint32 memento = be64toh(*(uint64_t *)key_data(target)) & ((1UL << 9) - 1);
 
    uint64_t found_values_int = 0;
    page_handle *pages[N_PAGES * 24] = {0};
@@ -1148,14 +1150,17 @@ routing_filter_lookup_range(cache          *cc,
    uint64_t  index_size = cfg->index_size;
    uint64_t  page_size  = cache_config_page_size(cfg->cache_cfg);
 
-   uint32_t min_fp = hash(key_data(min), key_length(min), seed);
-   uint32_t max_fp = hash(key_data(max), key_length(max), seed);
+   uint32_t min_fp = hash(key_data(min), key_length(min), seed) << 9;
+   uint32_t max_fp = hash(key_data(max), key_length(max), seed) << 9;
    
+   min_fp >>= 9;
+   max_fp >>= 9;
+
    // platform_error_log("query fp before: %lu\n", fp);
    // fp >>= 32 - cfg->fingerprint_size;
    // platform_error_log("fp after shift: %lu\n", fp);
-   uint32_t min_memento = min_fp & ((1ULL << 9) - 1);
-   uint32_t max_memento = max_fp & ((1ULL << 9) - 1);
+   uint32_t min_memento = be64toh(*(uint64_t *)key_data(min)) & ((1ULL << 9) - 1);
+   uint32_t max_memento = be64toh(*(uint64_t *)key_data(max)) & ((1ULL << 9) - 1);
    uint64_t found_values_int = 0;
    page_handle *pages[N_PAGES * 24] = {0};
 

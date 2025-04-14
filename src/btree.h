@@ -12,6 +12,7 @@
 #include "mini_allocator.h"
 #include "iterator.h"
 #include "util.h"
+#include "endian.h"
 
 /*
  * Max height of the BTree. This is somewhat of an arbitrary limit to size

@@ -3188,7 +3188,8 @@ btree_pack_loop(btree_pack_req *req,       // IN/OUT
 
       fp <<= 9;
 
-      uint32 memento = (*(uint64_t *)key_data(tuple_key)) & ((1UL << 9) - 1);
+      uint32 memento = be64toh(*(uint64_t *)key_data(tuple_key)) & ((1UL << 9) - 1);
+      platform_error_log("btree { fp, memento }: { %u, %u }\n", fp>>9, memento);
 
       fp |= memento;
 

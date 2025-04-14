@@ -634,7 +634,8 @@ CTEST2(splinterdb_quick, test_iterator_prev_and_next)
  */
 CTEST2(splinterdb_quick, test_close_and_reopen)
 {
-   slice        user_key = slice_create(strlen("some-key"), "some-key");
+   uint64_t num = htobe64(100UL);
+   slice        user_key = slice_create(sizeof(uint64_t), &num);
    const char  *val      = "some-value";
    const size_t val_len  = strlen(val);
 
@@ -674,14 +675,15 @@ CTEST2(splinterdb_quick, test_close_and_reopen)
  */
 CTEST2(splinterdb_quick, test_repeated_insert_close_reopen)
 {
-   char  *keystring = "some-key";
-   size_t key_len   = strlen(keystring);
+   uint64_t key = htobe64(100UL);
+   // char  *keystring = "some-key";
+   size_t key_len   = sizeof(key);
    char  *val       = "f";
    size_t val_len   = strlen(val);
 
    for (int i = 0; i < 20; i++) {
       int rc = splinterdb_insert(data->kvsb,
-                                 slice_create(key_len, keystring),
+                                 slice_create(key_len, &key),
                                  slice_create(val_len, val));
       ASSERT_EQUAL(0, rc, "Insert is expected to pass, iter=%d.", i);
 
@@ -1084,4 +1086,116 @@ custom_key_comparator(const data_config *cfg, slice key1, slice key2)
       (comparison_counting_data_config *)cfg;
    ccfg->num_comparisons += 1;
    return r;
+}
+
+///////////////////////////////
+// *** Range Query Tests *** //
+///////////////////////////////
+
+// CTEST2(splinterdb_quick, test_range_query)
+// {
+//    const uint64 num_inserts = 1UL << 14;
+//    // Should insert keys: 1, 4, 7, 10 13, 16, 19, ...
+//    uint64 minkey  = 1;
+//    uint64 hop_amt = 10;
+//    uint64 rc      = insert_keys(data->kvsb, minkey, num_inserts, hop_amt);
+//    ASSERT_EQUAL(0, rc);
+
+//    splinterdb_iterator *it = NULL;
+   
+//    uint64_t nonempty_range_start = htobe64(minkey);
+//    uint64_t nonempty_range_end = htobe64(minkey + 50);
+
+//    int res = splinterdb_range_query(
+//       data->kvsb,
+//       &it,
+//       slice_create(sizeof(uint64_t), &nonempty_range_start),
+//       slice_create(sizeof(uint64_t), &nonempty_range_end));
+//    ASSERT_EQUAL(0, res);
+
+//    // it is start iterator
+
+//    it = NULL;
+   
+//    uint64_t empty_range_start = htobe64(minkey + 1);
+//    uint64_t empty_range_end = htobe64(minkey + 9);
+
+//    res = splinterdb_range_query(
+//       data->kvsb,
+//       &it,
+//       slice_create(sizeof(uint64_t), &empty_range_start),
+//       slice_create(sizeof(uint64_t), &empty_range_end));
+//    ASSERT_EQUAL(0, res);
+
+//    // it is end iterator
+// }
+
+CTEST2(splinterdb_quick, test_range_query_2)
+{
+   const int num_inserts = 50;
+   uint64_t  keys[50]    = {0};
+   int       rc          = insert_some_keys(num_inserts, data->kvsb, keys);
+   ASSERT_EQUAL(0, rc);
+
+   // Set up the range query from key 20 to 40.
+   uint64_t start_val = htobe64(20);
+   uint64_t end_val   = htobe64(40);
+   slice    start_key = slice_create(sizeof(uint64_t), &start_val);
+   slice    end_key   = slice_create(sizeof(uint64_t), &end_val);
+
+   // Run range query
+   splinterdb_iterator *iter = NULL;
+   rc = splinterdb_range_query(data->kvsb, &iter, start_key, end_key);
+   ASSERT_EQUAL(0, rc);
+
+   // Verify that the iterator starts at 20 and can iterate through inserts
+   int i = 20;
+   while (splinterdb_iterator_valid(iter)) {
+      rc = check_current_tuple(iter, i);
+      ASSERT_EQUAL(0, rc);
+      i++;
+      splinterdb_iterator_next(iter);
+   }
+
+   ASSERT_EQUAL(num_inserts, i - 1);
+
+   splinterdb_iterator_deinit(iter);
+}
+
+
+CTEST2(splinterdb_quick, test_range_query_3)
+{
+   const int num_inserts = 50;
+   uint64_t  keys[50]    = {0};
+   int       rc          = insert_some_keys(num_inserts, data->kvsb, keys);
+   ASSERT_EQUAL(0, rc);
+
+   // Set up the range query from key 20 to 40.
+   uint64_t start_val = htobe64(20);
+   uint64_t end_val   = htobe64(40);
+   slice    start_key = slice_create(sizeof(uint64_t), &start_val);
+   slice    end_key   = slice_create(sizeof(uint64_t), &end_val);
+
+   // Close and re-open the database
+   splinterdb_close(&data->kvsb);
+   rc = splinterdb_open(&data->cfg, &data->kvsb);
+   ASSERT_EQUAL(0, rc);
+
+   // Run range query
+   splinterdb_iterator *iter = NULL;
+   rc = splinterdb_range_query(data->kvsb, &iter, start_key, end_key);
+   ASSERT_EQUAL(0, rc);
+
+   // Verify that the iterator starts at 20 and can iterate through inserts
+   int i = 20;
+   while (splinterdb_iterator_valid(iter)) {
+      rc = check_current_tuple(iter, i);
+      ASSERT_EQUAL(0, rc);
+      i++;
+      splinterdb_iterator_next(iter);
+   }
+
+   ASSERT_EQUAL(num_inserts, i - 1);
+
+   splinterdb_iterator_deinit(iter);
 }

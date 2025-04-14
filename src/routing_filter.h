@@ -13,6 +13,7 @@
  #include "platform.h"
  #include "memento.h"
  #include "memento_int.h"
+ #include "endian.h"
  
  /*
   * In Splinter, there is a strict max number of compacted tuples in a node, so

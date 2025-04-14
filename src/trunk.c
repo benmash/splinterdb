@@ -7286,11 +7286,15 @@ entry_scan(trunk_handle *spl, key start_key, key end_key, merge_accumulator *res
    uint64 mt_gen_end        = memtable_generation_retired(spl->mt_ctxt);
    platform_assert(mt_gen_start - mt_gen_end <= TRUNK_NUM_MEMTABLES);
 
-   uint64 start_key_int = key_to_int(start_key);
-   uint64 end_key_int   = key_to_int(end_key);
+   uint64_t loop_count = 0;
+
+   uint64 start_key_int = be64toh(key_to_int(start_key));
+   uint64 end_key_int   = be64toh(key_to_int(end_key));
    for (uint64 mt_gen = mt_gen_start; mt_gen != mt_gen_end; mt_gen--) {
       for (uint64 i = start_key_int; i <= end_key_int; i++) {
-         key target = key_create_from_slice(slice_create(sizeof(uint64_t), &i));
+         loop_count++;
+         uint64_t lookfor = htobe64(i);
+         key target = key_create_from_slice(slice_create(sizeof(uint64_t), &lookfor));
          platform_status rc = trunk_memtable_lookup(spl, mt_gen, target, result);
          platform_assert_status_ok(rc);
          if (merge_accumulator_is_definitive(result)) {
@@ -7328,20 +7332,36 @@ bool32
 traverse_trunk(trunk_handle *spl, trunk_node *node, key start, key end)
 {
    platform_error_log("dfsing the trunk [%lu]\n", node->page->disk_addr);
+   // trunk_print_node(stderr, spl, node->addr);
+   // trunk_print_subtree(stderr, spl, spl->root_addr);
+   // trunk_print(stderr, spl);
 
+   bool32 good_tree = trunk_verify_tree(spl);
 
    routing_config *cfg = &spl->cfg.filter_cfg;
 
    uint64_t any_found_in_trunk = 0;
 
+   // uint16 poop = trunk_start_sb_filter(spl, node);
+   // platform_error_log("i: %u\n", poop);
+   // platform_error_log("cond: %u\n", trunk_end_sb_filter(spl, node));
+
+   // uint64_t found_values;
+   // platform_status r = routing_filter_lookup_range(spl->cc, cfg, node->hdr->sb_filter, start, end, &found_values);
+   // platform_error_log("found_values: %lu\n", found_values);
+
    for (uint16 sb_filter_no = trunk_start_sb_filter(spl, node);
         sb_filter_no != trunk_end_sb_filter(spl, node);
         sb_filter_no = trunk_add_subbundle_filter_number(spl, sb_filter_no, 1))
    {
+   // for (uint sb_filter_no = 0; sb_filter_no < node->hdr->end_subbundle; sb_filter_no++) {
       routing_filter *sb_filter = trunk_get_sb_filter(spl, node, sb_filter_no);
       
+      platform_error_log("valid filter: %u [%u]\n", sb_filter_no, trunk_sb_filter_valid(spl, node, sb_filter_no)); 
+
       uint64_t found_values;
       routing_filter_lookup_range(spl->cc, cfg, sb_filter, start, end, &found_values);
+      platform_error_log("found_values: %lu\n", found_values);
 
       any_found_in_trunk |= found_values;
    }
@@ -7350,14 +7370,25 @@ traverse_trunk(trunk_handle *spl, trunk_node *node, key start, key end)
       return TRUE;
    }
 
-   
-   uint16 pivot_no_start = trunk_find_pivot(spl, node, start, greater_than_or_equal);
-   uint16 pivot_no_end = trunk_find_pivot(spl, node, end, less_than_or_equal);
+   // if (trunk_node_is_leaf(node)) {
+   //    return FALSE;
+   // }
+
+   uint16 pivot_no_start = trunk_find_pivot(spl, node, start, less_than_or_equal);
+   uint16 pivot_no_end = trunk_find_pivot(spl, node, end, greater_than_or_equal);
    debug_assert(pivot_no_end <= trunk_num_children(spl, node));
 
-   for (uint16 pivot_no = pivot_no_start; pivot_no <= pivot_no_end; pivot_no++) {
+   for (uint16 pivot_no = pivot_no_start; pivot_no < pivot_no_end; pivot_no++) {
       trunk_pivot_data *pdata = trunk_get_pivot_data(spl, node, pivot_no);
          
+      uint64_t found_values;
+      platform_status rc = routing_filter_lookup_range(spl->cc, cfg, &pdata->filter, start, end, &found_values);
+      
+      if (found_values) {
+         return TRUE;
+      }
+      
+
       trunk_node child;
       trunk_node_get(spl->cc, pdata->addr, &child);
 
@@ -7375,13 +7406,13 @@ traverse_trunk(trunk_handle *spl, trunk_node *node, key start, key end)
 bool32
 do_range_query(trunk_handle *spl, key start_key, key end_key, merge_accumulator *result)
 {
-   platform_error_log("doing range query\n");
 
    bool32 in_memptable = entry_scan(spl, start_key, end_key, result);
 
    if (in_memptable) {
       return TRUE;
    }
+
 
    trunk_node node;
    trunk_root_get(spl, &node);

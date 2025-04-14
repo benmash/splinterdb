@@ -685,6 +685,7 @@ splinterdb_range_query(const splinterdb     *kvs,        // IN
 
 
    platform_error_log("range_range\n");
+   
    bool32 nonempty_range = do_range_query(kvs->spl, key_create_from_slice(start_key), key_create_from_slice(end_key), result);
 
    if (nonempty_range) {
