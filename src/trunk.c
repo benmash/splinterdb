@@ -7276,7 +7276,7 @@ key_to_int(key k)
 bool32
 entry_scan(trunk_handle *spl, key start_key, key end_key, merge_accumulator *result)
 {
-   platform_error_log("scanning memtable\n");
+   // platform_error_log("scanning memtable\n");
 
    merge_accumulator_set_to_null(result);
 
@@ -7331,7 +7331,7 @@ entry_scan(trunk_handle *spl, key start_key, key end_key, merge_accumulator *res
 bool32
 traverse_trunk(trunk_handle *spl, trunk_node *node, key start, key end)
 {
-   platform_error_log("dfsing the trunk [%lu]\n", node->page->disk_addr);
+   // platform_error_log("dfsing the trunk [%lu]\n", node->page->disk_addr);
    // trunk_print_node(stderr, spl, node->addr);
    // trunk_print_subtree(stderr, spl, spl->root_addr);
    // trunk_print(stderr, spl);
@@ -7387,7 +7387,10 @@ traverse_trunk(trunk_handle *spl, trunk_node *node, key start, key end)
       if (found_values) {
          return TRUE;
       }
-      
+
+      if (pdata->addr == 0) {
+         return FALSE;
+      }
 
       trunk_node child;
       trunk_node_get(spl->cc, pdata->addr, &child);
