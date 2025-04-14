@@ -439,6 +439,11 @@ $(BINDIR)/$(UNITDIR)/splinterdb_quick_test: $(COMMON_TESTOBJ)                   
                                             $(OBJDIR)/$(FUNCTIONAL_TESTSDIR)/test_async.o \
                                             $(LIBDIR)/libsplinterdb.so
 
+$(BINDIR)/$(UNITDIR)/benchmark_test: $(COMMON_TESTOBJ)                             \
+                                            $(COMMON_UNIT_TESTOBJ)                        \
+                                            $(OBJDIR)/$(FUNCTIONAL_TESTSDIR)/test_async.o \
+                                            $(LIBDIR)/libsplinterdb.so
+
 $(BINDIR)/$(UNITDIR)/splinterdb_stress_test: $(COMMON_TESTOBJ)                             \
                                              $(COMMON_UNIT_TESTOBJ)                        \
                                              $(OBJDIR)/$(FUNCTIONAL_TESTSDIR)/test_async.o \
