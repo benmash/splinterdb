@@ -25,6 +25,7 @@
 
 #define ROUTING_FPS_PER_PAGE 4096
 
+
 /*
  *----------------------------------------------------------------------
  * routing_hdr: Disk-resident structure.
@@ -523,7 +524,7 @@ routing_filter_add(cache                  *cc,
    QF qf;
    // give up 3 bits for metadata (32 -> 29), need minimum 18 for canonical slot/index -> 11 bits left -> 2 for fingerprint, 9 for memento
    // ceil(logR) = 9 --> supports range 512
-   qf_init_pages(&qf, 1024 * (N_PAGES - 3), 38, 9, QF_HASH_NONE, 0xBEEF, pages + (value * N_PAGES), N_PAGES, 2);
+   qf_init_pages(&qf, 1024 * (N_PAGES - 3), 38, MEMENTO_BITS, QF_HASH_NONE, 0xBEEF, pages + (value * N_PAGES), N_PAGES, 2);
    
    if (value != 0) {
       ((qf_index_page *) pages[(value - 1) * N_PAGES]->data)->next_filter = pages[value * N_PAGES]->disk_addr;
@@ -532,9 +533,9 @@ routing_filter_add(cache                  *cc,
    for (i = 0; i < num_new_fp; i++) {
       // insert singles rather than sort + batch insert // TODO: sort + batch insert
 
-      uint32_t memento = new_fp_arr[i] & ((1ULL << 9) - 1);
+      uint32_t memento = new_fp_arr[i] & ((1ULL << MEMENTO_BITS) - 1);
 
-      uint32_t fp = new_fp_arr[i] >> 9;
+      uint32_t fp = new_fp_arr[i] >> MEMENTO_BITS;
 
       // platform_error_log("filter { fp, memento }: { %u, %u }\n", fp, memento);
 
@@ -994,16 +995,16 @@ routing_filter_lookup(cache          *cc,
    uint64_t  index_size = cfg->index_size;
    uint64_t  page_size  = cache_config_page_size(cfg->cache_cfg);
 
-   uint32_t fp = hash(key_data(target), key_length(target), seed) << 9;
+   uint32_t fp = hash(key_data(target), key_length(target), seed) << MEMENTO_BITS;
    
-   fp >>= 9;
+   fp >>= MEMENTO_BITS;
 
    // platform_error_log("query fp before: %lu\n", fp);
    // fp >>= 32 - cfg->fingerprint_size;
    // platform_error_log("fp after shift: %lu\n", fp);
    // uint32_t memento = fp & ((1ULL << 9) - 1);
 
-   uint32 memento = be64toh(*(uint64_t *)key_data(target)) & ((1UL << 9) - 1);
+   uint32 memento = be64toh(*(uint64_t *)key_data(target)) & ((1UL << MEMENTO_BITS) - 1);
 
    uint64_t found_values_int = 0;
    page_handle *pages[N_PAGES * 24] = {0};
@@ -1150,17 +1151,17 @@ routing_filter_lookup_range(cache          *cc,
    uint64_t  index_size = cfg->index_size;
    uint64_t  page_size  = cache_config_page_size(cfg->cache_cfg);
 
-   uint32_t min_fp = hash(key_data(min), key_length(min), seed) << 9;
-   uint32_t max_fp = hash(key_data(max), key_length(max), seed) << 9;
+   uint32_t min_fp = hash(key_data(min), key_length(min), seed) << MEMENTO_BITS;
+   uint32_t max_fp = hash(key_data(max), key_length(max), seed) << MEMENTO_BITS;
    
-   min_fp >>= 9;
-   max_fp >>= 9;
+   min_fp >>= MEMENTO_BITS;
+   max_fp >>= MEMENTO_BITS;
 
    // platform_error_log("query fp before: %lu\n", fp);
    // fp >>= 32 - cfg->fingerprint_size;
    // platform_error_log("fp after shift: %lu\n", fp);
-   uint32_t min_memento = be64toh(*(uint64_t *)key_data(min)) & ((1ULL << 9) - 1);
-   uint32_t max_memento = be64toh(*(uint64_t *)key_data(max)) & ((1ULL << 9) - 1);
+   uint32_t min_memento = be64toh(*(uint64_t *)key_data(min)) & ((1ULL << MEMENTO_BITS) - 1);
+   uint32_t max_memento = be64toh(*(uint64_t *)key_data(max)) & ((1ULL << MEMENTO_BITS) - 1);
    uint64_t found_values_int = 0;
    page_handle *pages[N_PAGES * 24] = {0};
 

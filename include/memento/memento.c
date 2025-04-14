@@ -2398,6 +2398,7 @@ static inline uint64_t init_filter_pages(QF *qf, uint64_t nslots, uint64_t key_b
    uint64_t size;
    uint64_t total_num_bytes;
 
+
    /* nslots can be any number now, as opposed to just being able to be a power
     * of 2! */
    num_slots        = nslots;

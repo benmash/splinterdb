@@ -15,6 +15,7 @@
         "tuple": "c",
         "type_traits": "c",
         "utility": "c",
-        "public_platform.h": "c"
+        "public_platform.h": "c",
+        "memento_int.h": "c"
     }
 }

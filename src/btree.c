@@ -3,6 +3,7 @@
 
 #include "btree_private.h"
 #include "poison.h"
+#include "memento_int.h"
 
 /*
  * *****************************************************************
@@ -3186,9 +3187,9 @@ btree_pack_loop(btree_pack_req *req,       // IN/OUT
 
       uint32 fp = req->hash(key_data(tuple_key), key_length(tuple_key), req->seed);
 
-      fp <<= 9;
+      fp <<= MEMENTO_BITS;
 
-      uint32 memento = be64toh(*(uint64_t *)key_data(tuple_key)) & ((1UL << 9) - 1);
+      uint32 memento = be64toh(*(uint64_t *)key_data(tuple_key)) & ((1UL << MEMENTO_BITS) - 1);
       // platform_error_log("btree { fp, memento }: { %u, %u }\n", fp>>9, memento);
 
       fp |= memento;

@@ -38,6 +38,7 @@ extern "C" {
      * or other integer <= 56 (for compile-time-optimized bit-shifting-based versions)
      */
 #define QF_BITS_PER_SLOT 29
+#define MEMENTO_BITS 7
 
     /* Must be >= 6.  6 seems fastest. */
 #define QF_BLOCK_OFFSET_BITS (6)

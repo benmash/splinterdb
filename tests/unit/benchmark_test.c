@@ -207,14 +207,14 @@ CTEST2(benchmark, range_query_stress_test) {
 
     uint64 range_counts[N_RANGES] = {0};
 
-    uint64 range_width = (1UL << 8);
+    uint64 range_width = (1UL << 20);
 
     for (uint64 i = 0; i < N_RANGES; i++){
         range_starts[i] = (i * 121532) % (1UL << 30);
     }
 
 
-    for (uint64 i = 0; i < (1UL << 20); i++) {
+    for (uint64 i = 0; i < (1UL << 22); i++) {
         curr_key = ((curr_key + 7) * 41579) % (1UL << 30);
         
         for (uint64 ri = 0; ri < N_RANGES; ri++) {
@@ -235,6 +235,8 @@ CTEST2(benchmark, range_query_stress_test) {
     }
 
     printf("inserts done\n");
+
+    timestamp ts = platform_get_timestamp();
 
     uint64 nonempty_ranges = 0;
     for (uint64 i = 0; i < N_RANGES; i++){
@@ -268,6 +270,8 @@ CTEST2(benchmark, range_query_stress_test) {
             ASSERT_TRUE(k <= (range_starts[i] + range_width) );
         }
     }
+
+    printf("spent (%lu ms) on range queries\n", NSEC_TO_MSEC(platform_timestamp_elapsed(ts)));
 
     printf("nonempty ranges: %lu\n", nonempty_ranges);
 
