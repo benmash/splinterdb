@@ -236,6 +236,8 @@ CTEST2(benchmark, range_query_stress_test) {
 
     printf("inserts done\n");
 
+    timestamp ts = platform_get_timestamp();
+
     uint64 nonempty_ranges = 0;
     for (uint64 i = 0; i < N_RANGES; i++){
         // if (range_counts[i]) nonempty_ranges++;
@@ -280,6 +282,8 @@ CTEST2(benchmark, range_query_stress_test) {
         //     ASSERT_TRUE(k <= (range_starts[i] + range_width) );
         // }
     }
+
+    printf("spent (%lu ms) on range queries\n", NSEC_TO_MSEC(platform_timestamp_elapsed(ts)));
 
     printf("nonempty ranges: %lu\n", nonempty_ranges);
 
