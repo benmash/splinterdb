@@ -536,7 +536,7 @@ routing_filter_add(cache                  *cc,
 
       uint32_t fp = new_fp_arr[i] >> 9;
 
-      platform_error_log("filter { fp, memento }: { %u, %u }\n", fp, memento);
+      // platform_error_log("filter { fp, memento }: { %u, %u }\n", fp, memento);
 
       // platform_error_log("add: { fp, memento } = { %lu, %lu }\n", new_fp_arr[i], memento);
       qf_insert_single(&qf, fp, memento, QF_WAIT_FOR_LOCK | QF_KEY_IS_HASH);
