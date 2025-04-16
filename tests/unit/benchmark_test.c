@@ -54,6 +54,18 @@ static const char val_fmt[] = "val-%04lx";
 #define TEST_INSERT_KEY_LENGTH (KEY_FMT_LENGTH + 1)
 #define TEST_INSERT_VAL_LENGTH (VAL_FMT_LENGTH + 1)
 
+
+typedef struct thread_arg {
+    splinterdb *kvsb;
+    uint64 num_elem;
+    uint64 start_key;
+    uint64 *range_counts;
+    uint64 *range_starts;
+} thread_arg;
+
+static void *
+insert_on_thread(void *arg);
+
 // Function Prototypes
 static void
 create_default_cfg(splinterdb_config *out_cfg, data_config *default_data_cfg);
@@ -113,6 +125,9 @@ CTEST_SETUP(benchmark)
    create_default_cfg(&data->cfg, &data->default_data_cfg.super);
    data->cfg.use_shmem =
       config_parse_use_shmem(Ctest_argc, (char **)Ctest_argv);
+
+    data->cfg.num_normal_bg_threads = 2;
+    data->cfg.num_memtable_bg_threads = 2;
 
    int rc = splinterdb_create(&data->cfg, &data->kvsb);
    ASSERT_EQUAL(0, rc);
@@ -199,7 +214,9 @@ CTEST2(benchmark, range_query_stress_test) {
 
     // fill tree with bunch of integer keys
 
-    #define N_RANGES 10000
+    #define N_RANGES 40000
+
+    #define RANGE_WIDTH (1UL << 8)
 
     uint64 curr_key = 0;
 
@@ -207,34 +224,40 @@ CTEST2(benchmark, range_query_stress_test) {
 
     uint64 range_counts[N_RANGES] = {0};
 
-    uint64 range_width = (1UL << 20);
+    uint64 range_width = RANGE_WIDTH;
 
     for (uint64 i = 0; i < N_RANGES; i++){
         range_starts[i] = (i * 121532) % (1UL << 30);
     }
 
+    #define NUM_INSERTS (1UL << 23)
 
-    for (uint64 i = 0; i < (1UL << 22); i++) {
-        curr_key = ((curr_key + 7) * 41579) % (1UL << 30);
-        
-        for (uint64 ri = 0; ri < N_RANGES; ri++) {
-            if (range_starts[ri] < curr_key && curr_key < (range_starts[ri] + range_width)) {
-                range_counts[ri]++;
-            }
+    printf("\n");
+
+#define num_threads 4
+   pthread_t thread_ids[num_threads];
+
+   for (int i = 0; i < num_threads; i++) {
+    
+        thread_arg arg = (thread_arg){.kvsb=data->kvsb, .num_elem=NUM_INSERTS, .start_key=i, .range_counts=range_counts, .range_starts=range_starts};
+        int rc = pthread_create(&thread_ids[i], NULL, &insert_on_thread, &arg);
+        ASSERT_EQUAL(0, rc);
+   }
+
+    for (int i = 0; i < num_threads; i++) {
+        void *thread_rc;
+        int   rc = pthread_join(thread_ids[i], &thread_rc);
+        ASSERT_EQUAL(0, rc);
+        if (thread_rc != 0) {
+        CTEST_ERR(
+            "Thread %d [ID=%lu] had error: %p\n", i, thread_ids[i], thread_rc);
         }
-
-        uint64 be_key = htobe64(curr_key);
-
-        slice next_key = slice_create(sizeof(uint64), &be_key);
-
-        char msg[] = "arbitrary content, lots of bytes to push to disk";
-
-        slice value = slice_create(sizeof(uint64), msg);
-
-        splinterdb_insert(data->kvsb, next_key, value);
     }
 
-    printf("inserts done\n");
+
+    printf("\ninserts done\n");
+
+    // trunk_print(stderr, splinterdb_get_trunk_handle(data->kvsb));
 
     timestamp ts = platform_get_timestamp();
 
@@ -282,8 +305,53 @@ static void
 create_default_cfg(splinterdb_config *out_cfg, data_config *default_data_cfg)
 {
    *out_cfg = (splinterdb_config){.filename   = TEST_DB_NAME,
-                                  .cache_size = 1 * Giga,
-                                  .disk_size  = 8 * Giga,
+                                  .cache_size = 2 * Giga,
+                                  .disk_size  = 16 * Giga,
                                   .use_shmem  = FALSE,
                                   .data_cfg   = default_data_cfg};
+}
+
+static void *
+insert_on_thread(void *arg){
+
+    thread_arg targ = *(thread_arg *)arg;
+
+    splinterdb *kvsb = targ.kvsb;
+
+    uint64 *range_counts = targ.range_counts;
+    uint64 *range_starts = targ.range_starts;
+
+    uint64 curr_key = targ.start_key;
+
+    splinterdb_register_thread(kvsb);
+
+    for (uint64 i = 0; i < targ.num_elem; i++) {
+        curr_key = ((curr_key + 7) * 41579) % (1UL << 30);
+        
+        if (i % (1UL << 20) == 0) {
+            printf(".");
+            fflush(stdout);
+            sleep(5);
+        }
+        
+        for (uint64 ri = 0; ri < N_RANGES; ri++) {
+            if (range_starts[ri] < curr_key && curr_key < (range_starts[ri] + RANGE_WIDTH)) {
+                range_counts[ri]++;
+            }
+        }
+
+        uint64 be_key = htobe64(curr_key);
+
+        slice next_key = slice_create(sizeof(uint64), &be_key);
+
+        char msg[] = "arbitrary content, lots of bytes to push to disk";
+
+        slice value = slice_create(sizeof(uint64), msg);
+
+        splinterdb_insert(kvsb, next_key, value);
+    }
+
+    splinterdb_deregister_thread(kvsb);
+
+    return 0;
 }

@@ -4119,7 +4119,7 @@ trunk_build_filters(trunk_handle             *spl,
       if (!filter_scratch->should_build[pos]) {
          continue;
       }
-      routing_filter old_filter = filter_scratch->old_filter[pos]; // TODO: change type?
+      routing_filter old_filter = filter_scratch->old_filter[pos];
       uint32         fp_start, fp_end;
       uint64         generation = compact_req->pivot_generation[pos];
       trunk_process_generation_to_fp_bounds(
@@ -4133,7 +4133,7 @@ trunk_build_filters(trunk_handle             *spl,
          filter_scratch->filter[pos] = old_filter;
          continue;
       }
-      //TODO: important, create filter here
+
       routing_filter  new_filter;
       routing_config *filter_cfg = &spl->cfg.filter_cfg;
       uint16          value      = filter_scratch->value[pos];
@@ -6393,299 +6393,6 @@ trunk_range_iterator_init(trunk_handle         *spl,
    return rc;
 }
 
-
-// platform_status
-// trunk_range_range_filter_iterator_init(trunk_handle         *spl,
-//                                        trunk_range_iterator *range_itor,
-//                                        key                   min_key,
-//                                        key                   max_key,
-//                                        key                   start_key,
-//                                        comparison            start_type,
-//                                        uint64                num_tuples)
-// {
-//    debug_assert(!key_is_null(min_key));
-//    debug_assert(!key_is_null(max_key));
-//    debug_assert(!key_is_null(start_key));
-
-//    range_itor->spl          = spl;
-//    range_itor->super.ops    = &trunk_range_iterator_ops;
-//    range_itor->num_branches = 0;
-//    range_itor->num_tuples   = num_tuples;
-//    range_itor->merge_itor   = NULL;
-//    range_itor->can_prev     = TRUE;
-//    range_itor->can_next     = TRUE;
-
-//    if (trunk_key_compare(spl, min_key, start_key) > 0) {
-//       // in bounds, start at min
-//       start_key = min_key;
-//    }
-//    if (trunk_key_compare(spl, max_key, start_key) <= 0) {
-//       // out of bounds, start at max
-//       start_key = max_key;
-//    }
-
-//    // copy over global min and max
-//    key_buffer_init_from_key(&range_itor->min_key, spl->heap_id, min_key);
-//    key_buffer_init_from_key(&range_itor->max_key, spl->heap_id, max_key);
-
-//    ZERO_ARRAY(range_itor->compacted);
-
-//    // grab the lookup lock
-//    memtable_begin_lookup(spl->mt_ctxt);
-
-//    // memtables
-//    ZERO_ARRAY(range_itor->branch);
-//    // Note this iteration is in descending generation order
-//    range_itor->memtable_start_gen = memtable_generation(spl->mt_ctxt);
-//    range_itor->memtable_end_gen   = memtable_generation_retired(spl->mt_ctxt);
-//    range_itor->num_memtable_branches =
-//       range_itor->memtable_start_gen - range_itor->memtable_end_gen;
-//    for (uint64 mt_gen = range_itor->memtable_start_gen;
-//         mt_gen != range_itor->memtable_end_gen;
-//         mt_gen--)
-//    {
-//       platform_assert(
-//          (range_itor->num_branches < TRUNK_RANGE_ITOR_MAX_BRANCHES),
-//          "range_itor->num_branches=%lu should be < "
-//          " TRUNK_RANGE_ITOR_MAX_BRANCHES (%d).",
-//          range_itor->num_branches,
-//          TRUNK_RANGE_ITOR_MAX_BRANCHES);
-//       debug_assert(range_itor->num_branches < ARRAY_SIZE(range_itor->branch));
-
-//       bool32 compacted;
-//       uint64 root_addr =
-//          trunk_memtable_root_addr_for_lookup(spl, mt_gen, &compacted);
-//       range_itor->compacted[range_itor->num_branches] = compacted;
-//       if (compacted) {
-//          btree_block_dec_ref(spl->cc, &spl->cfg.btree_cfg, root_addr);
-//       } else {
-//          trunk_memtable_inc_ref(spl, mt_gen);
-//       }
-
-//       range_itor->branch[range_itor->num_branches].root_addr = root_addr;
-
-//       range_itor->num_branches++;
-//    }
-
-//    trunk_node node;
-//    trunk_node_get(spl->cc, spl->root_addr, &node);
-//    memtable_end_lookup(spl->mt_ctxt);
-
-//    // index btrees
-//    uint16 height = trunk_node_height(&node);
-//    for (uint16 h = height; h > 0; h--) {
-//       uint16 pivot_no;
-//       if (start_type != less_than) {
-//          pivot_no = trunk_find_pivot(spl, &node, start_key, less_than_or_equal);
-//       } else {
-//          pivot_no = trunk_find_pivot(spl, &node, start_key, less_than);
-//       }
-//       debug_assert(pivot_no < trunk_num_children(spl, &node));
-//       trunk_pivot_data *pdata = trunk_get_pivot_data(spl, &node, pivot_no);
-
-//       for (uint16 branch_offset = 0;
-//            branch_offset != trunk_pivot_branch_count(spl, &node, pdata);
-//            branch_offset++)
-//       {
-//          platform_assert(
-//             (range_itor->num_branches < TRUNK_RANGE_ITOR_MAX_BRANCHES),
-//             "range_itor->num_branches=%lu should be < "
-//             " TRUNK_RANGE_ITOR_MAX_BRANCHES (%d).",
-//             range_itor->num_branches,
-//             TRUNK_RANGE_ITOR_MAX_BRANCHES);
-
-//          debug_assert(range_itor->num_branches
-//                       < ARRAY_SIZE(range_itor->branch));
-//          uint16 branch_no = trunk_subtract_branch_number(
-//             spl, trunk_end_branch(spl, &node), branch_offset + 1);
-//          range_itor->branch[range_itor->num_branches] =
-//             *trunk_get_branch(spl, &node, branch_no);
-//          range_itor->compacted[range_itor->num_branches] = TRUE;
-//          uint64 root_addr =
-//             range_itor->branch[range_itor->num_branches].root_addr;
-//          btree_block_dec_ref(spl->cc, &spl->cfg.btree_cfg, root_addr);
-//          range_itor->num_branches++;
-//       }
-
-//       trunk_node child;
-//       trunk_node_get(spl->cc, pdata->addr, &child);
-//       trunk_node_unget(spl->cc, &node);
-//       node = child;
-//    }
-   
-//    // leaf btrees
-//    for (uint16 branch_offset = 0;
-//         branch_offset != trunk_branch_count(spl, &node);
-//         branch_offset++)
-//    {
-//       uint16 branch_no = trunk_subtract_branch_number(
-//          spl, trunk_end_branch(spl, &node), branch_offset + 1);
-//       range_itor->branch[range_itor->num_branches] =
-//          *trunk_get_branch(spl, &node, branch_no);
-//       uint64 root_addr = range_itor->branch[range_itor->num_branches].root_addr;
-//       btree_block_dec_ref(spl->cc, &spl->cfg.btree_cfg, root_addr);
-//       range_itor->compacted[range_itor->num_branches] = TRUE;
-//       range_itor->num_branches++;
-//    }
-
-//    // have a leaf, use to establish local bounds
-//    key local_min =
-//       trunk_key_compare(spl, trunk_min_key(spl, &node), min_key) > 0
-//          ? trunk_min_key(spl, &node)
-//          : min_key;
-//    key local_max =
-//       trunk_key_compare(spl, trunk_max_key(spl, &node), max_key) < 0
-//          ? trunk_max_key(spl, &node)
-//          : max_key;
-//    key_buffer_init_from_key(
-//       &range_itor->local_min_key, spl->heap_id, local_min);
-//    key_buffer_init_from_key(
-//       &range_itor->local_max_key, spl->heap_id, local_max);
-
-      
-//    // ** interception point
-   
-//    uint64_t sb_i = node.hdr->start_sb_filter;
-//    uint64_t sb_l = node.hdr->end_sb_filter;
-
-//    // TODO **VERY IMPORTANT**: find specifically which branches to check
-//    uint64_t any_success = 0;
-//    for (; sb_i < sb_l; sb_i++) {
-//       routing_filter *filt = node.hdr->sb_filter + sb_i;
-//       uint64_t found_values;
-//       platform_status rc = routing_filter_lookup_range(spl->cc, &spl->cfg.filter_cfg, filt, local_min, local_max, &found_values);
-//       platform_assert_status_ok(rc);
-      
-//       any_success |= found_values;
-//    }
-   
-//    trunk_node_unget(spl->cc, &node);
-
-//    // if (trunk_key_compare(range_itor->spl, local_max_key, max_key) < 0) {
-//    key local_max_key = key_buffer_key(&range_itor->local_max_key);
-//    key local_min_key = key_buffer_key(&range_itor->local_min_key);
-
-//    if (any_success == 0 && trunk_key_compare(range_itor->spl, local_max_key, max_key) < 0) {
-//    // if (any_success == 0 ) {
-//       uint64 temp_tuples = range_itor->num_tuples;
-//       // // Reset the branch state so that reinitialization starts clean.
-//       // range_itor->num_branches = 0;
-//       // range_itor->merge_itor   = NULL;
-      
-//       return trunk_range_range_filter_iterator_init(range_itor->spl,
-//                                                     range_itor,
-//                                                     min_key,
-//                                                     local_max_key,
-//                                                     local_max_key,
-//                                                     greater_than_or_equal,
-//                                                     range_itor->num_tuples);
-//    } else if (any_success == 0 && trunk_key_compare(range_itor->spl, local_min_key, min_key) > 0) {
-//       uint64 temp_tuples = range_itor->num_tuples;
-//       // // Reset the branch state so that reinitialization starts clean.
-//       // range_itor->num_branches = 0;
-//       // range_itor->merge_itor   = NULL;
-//       return trunk_range_range_filter_iterator_init(range_itor->spl,
-//                                                     range_itor,
-//                                                     local_min_key,
-//                                                     max_key,
-//                                                     local_min_key,
-//                                                     less_than_or_equal,
-//                                                     range_itor->num_tuples);
-//    }
-
-
-//    for (uint64 i = 0; i < range_itor->num_branches; i++) {
-//       uint64          branch_no  = range_itor->num_branches - i - 1;
-//       btree_iterator *btree_itor = &range_itor->btree_itor[branch_no];
-//       trunk_branch   *branch     = &range_itor->branch[branch_no];
-//       if (range_itor->compacted[branch_no]) {
-//          bool32 do_prefetch =
-//             range_itor->compacted[branch_no] && num_tuples > TRUNK_PREFETCH_MIN
-//                ? TRUE
-//                : FALSE;
-//          trunk_branch_iterator_init(spl,
-//                                     btree_itor,
-//                                     branch,
-//                                     key_buffer_key(&range_itor->local_min_key),
-//                                     key_buffer_key(&range_itor->local_max_key),
-//                                     start_key,
-//                                     start_type,
-//                                     do_prefetch,
-//                                     FALSE);
-//       } else {
-//          uint64 mt_root_addr = branch->root_addr;
-//          bool32 is_live      = branch_no == 0;
-//          trunk_memtable_iterator_init(
-//             spl,
-//             btree_itor,
-//             mt_root_addr,
-//             key_buffer_key(&range_itor->local_min_key),
-//             key_buffer_key(&range_itor->local_max_key),
-//             start_key,
-//             start_type,
-//             is_live,
-//             FALSE);
-//       }
-//       range_itor->itor[i] = &btree_itor->super;
-//    }
-
-//    platform_status rc = merge_iterator_create(spl->heap_id,
-//                                               spl->cfg.data_cfg,
-//                                               range_itor->num_branches,
-//                                               range_itor->itor,
-//                                               MERGE_FULL,
-//                                               &range_itor->merge_itor);
-//    if (!SUCCESS(rc)) {
-//       return rc;
-//    }
-
-//    bool32 in_range = iterator_can_curr(&range_itor->merge_itor->super);
-
-//    /*
-//     * if the merge itor is already exhausted, and there are more keys in the
-//     * db/range, move to prev/next leaf
-//     */
-//    if (!in_range && start_type >= greater_than) {
-//       if (trunk_key_compare(spl, local_max, max_key) < 0) {
-//          trunk_range_iterator_deinit(range_itor);
-//          rc = trunk_range_range_filter_iterator_init(spl,
-//                                                      range_itor,
-//                                                      min_key,
-//                                                      max_key,
-//                                                      local_max,
-//                                                      start_type,
-//                                                      range_itor->num_tuples);
-//          if (!SUCCESS(rc)) {
-//             return rc;
-//          }
-//       } else {
-//          range_itor->can_next = FALSE;
-//          range_itor->can_prev =
-//             iterator_can_prev(&range_itor->merge_itor->super);
-//       }
-//    }
-//    if (!in_range && start_type <= less_than_or_equal) {
-//       if (trunk_key_compare(spl, local_min, min_key) > 0) {
-//          trunk_range_iterator_deinit(range_itor);
-//          rc = trunk_range_range_filter_iterator_init(spl,
-//                                                      range_itor,
-//                                                      min_key,
-//                                                      max_key,
-//                                                      local_min,
-//                                                      start_type,
-//                                                      range_itor->num_tuples);
-//          if (!SUCCESS(rc)) {
-//             return rc;
-//          }
-//       } else {
-//          range_itor->can_prev = FALSE;
-//          range_itor->can_next =
-//             iterator_can_next(&range_itor->merge_itor->super);
-//       }
-//    }
-//    return rc;
-// }
-
 void
 trunk_range_iterator_curr(iterator *itor, key *curr_key, message *data)
 {
@@ -7357,11 +7064,11 @@ traverse_trunk(trunk_handle *spl, trunk_node *node, key start, key end)
    // for (uint sb_filter_no = 0; sb_filter_no < node->hdr->end_subbundle; sb_filter_no++) {
       routing_filter *sb_filter = trunk_get_sb_filter(spl, node, sb_filter_no);
       
-      platform_error_log("valid filter: %u [%u]\n", sb_filter_no, trunk_sb_filter_valid(spl, node, sb_filter_no)); 
+      // platform_error_log("valid filter: %u [%u]\n", sb_filter_no, trunk_sb_filter_valid(spl, node, sb_filter_no)); 
 
       uint64_t found_values;
       routing_filter_lookup_range(spl->cc, cfg, sb_filter, start, end, &found_values);
-      platform_error_log("found_values: %lu\n", found_values);
+      // platform_error_log("found_values: %lu\n", found_values);
 
       any_found_in_trunk |= found_values;
    }

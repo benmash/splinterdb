@@ -2421,17 +2421,15 @@ static inline uint64_t init_filter_pages(QF *qf, uint64_t nslots, uint64_t key_b
 
 	assert(QF_BITS_PER_SLOT == 0 || QF_BITS_PER_SLOT == bits_per_slot);
 	assert(bits_per_slot > 1);
-#if QF_BITS_PER_SLOT == 8 || QF_BITS_PER_SLOT == 16 || QF_BITS_PER_SLOT == 32 || QF_BITS_PER_SLOT == 64 // TODO size TODO bytes
+#if QF_BITS_PER_SLOT == 8 || QF_BITS_PER_SLOT == 16 || QF_BITS_PER_SLOT == 32 || QF_BITS_PER_SLOT == 64
 	size = nblocks * sizeof(qfblock);
 #else
-	// size = nblocks * (sizeof(qfblock) + QF_SLOTS_PER_BLOCK * bits_per_slot / 8);
     size = nblocks * sizeof(qfblock);
 #endif
 
 	total_num_bytes = sizeof(qfmetadata) + size;
 	if (pages == NULL || total_num_bytes > 4096 * n_pages)
 		return total_num_bytes;
-	// memset(buffer, 0, total_num_bytes);
 
     qf_index_page *index = (qf_index_page *) (pages[0]->data);
     for (int i = 1; i < n_pages; i++) {
@@ -2460,14 +2458,11 @@ static inline uint64_t init_filter_pages(QF *qf, uint64_t nslots, uint64_t key_b
 	qf->metadata->range = qf->metadata->nslots;
 	qf->metadata->range <<= qf->metadata->fingerprint_bits \
                             + qf->metadata->memento_bits;
-	// qf->metadata->nblocks = (qf->metadata->xnslots + QF_SLOTS_PER_BLOCK - 1) \
-    //                         / QF_SLOTS_PER_BLOCK;
     qf->metadata->nblocks = nblocks;
 	qf->metadata->nelts = 0;
 	qf->metadata->ndistinct_elts = 0;
 	qf->metadata->noccupied_slots = 0;
 
-	// qf->runtimedata->num_locks = (qf->metadata->xnslots / NUM_SLOTS_TO_LOCK) + 2;
     qf->runtimedata->num_locks = 2;
 	qf->runtimedata->f_info.filepath = NULL;
 
@@ -2614,13 +2609,6 @@ void qf_reset(QF *qf)
 #ifdef LOG_WAIT_TIME
 	memset(qf->wait_times, 0, (qf->runtimedata->num_locks + 1) 
                                 * sizeof(wait_time_data));
-#endif
-#if QF_BITS_PER_SLOT == 8 || QF_BITS_PER_SLOT == 16 || QF_BITS_PER_SLOT == 32 || QF_BITS_PER_SLOT == 64
-	memset(qf->blocks, 0, qf->metadata->nblocks* sizeof(qfblock));
-#else
-    //TODO: change
-	/*memset(qf->blocks, 0, qf->metadata->nblocks*(sizeof(qfblock) + 
-                QF_SLOTS_PER_BLOCK * qf->metadata->bits_per_slot / 8));*/
 #endif
 }
 

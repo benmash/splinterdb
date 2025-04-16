@@ -335,56 +335,15 @@ routing_filter_add(cache                  *cc,
                    uint64                  num_new_fp,
                    uint16                  value)
 {
-   ZERO_CONTENTS(filter);
-   // TODO old filter add fingerprints
-   
+   ZERO_CONTENTS(filter);   
    platform_assert(value < 24);
    
-
-   // // old filter
-   // uint32 old_log_num_buckets          = 0;
-   // uint32 old_num_indices              = 1;
-   // uint32 old_remainder_size           = 0;
-   // size_t old_value_size               = 0;
-   // uint32 old_value_mask               = 0;
-   // size_t old_remainder_and_value_size = 0;
    if (old_filter->addr != 0) {
       mini_unkeyed_prefetch(cc, PAGE_TYPE_FILTER, old_filter->meta_head);
-
-   //    old_log_num_buckets = 31 - __builtin_clz(old_filter->num_fingerprints);
-   //    if (old_log_num_buckets < cfg->log_index_size) {
-   //       old_log_num_buckets = cfg->log_index_size;
       }
-   //    uint32 old_log_num_indices = old_log_num_buckets - cfg->log_index_size;
-   //    old_num_indices            = 1UL << old_log_num_indices;
-   //    old_remainder_size         = cfg->fingerprint_size - old_log_num_buckets;
-   //    old_value_size             = old_filter->value_size;
-   //    old_value_mask             = (1UL << old_value_size) - 1;
-   //    old_remainder_and_value_size = old_value_size + old_remainder_size;
-   //    platform_assert(cfg->fingerprint_size + old_value_size <= 32);
-   // }
 
    // compute parameters
-
    filter->num_fingerprints = num_new_fp + old_filter->num_fingerprints;
-   // filter->num_unique       = 0;
-
-   // uint32 log_num_buckets = 31 - __builtin_clz(filter->num_fingerprints);
-   // if (log_num_buckets < cfg->log_index_size) {
-   //    log_num_buckets = cfg->log_index_size;
-   // }
-   // uint32 log_num_indices = log_num_buckets - cfg->log_index_size;
-   // uint32 num_indices     = 1UL << log_num_indices;
-   // debug_assert(num_indices > 0);
-   // uint32 remainder_size           = cfg->fingerprint_size - log_num_buckets;
-   // size_t value_size               = value == 0 ? 0 : 32 - __builtin_clz(value);
-   // filter->value_size              = value_size;
-   // size_t remainder_and_value_size = value_size + remainder_size;
-   // uint32 remainder_and_value_mask = (1UL << remainder_and_value_size) - 1;
-   // size_t index_remainder_and_value_size =
-   //    remainder_and_value_size + cfg->log_index_size;
-   // uint32 new_indices_per_old_index = num_indices / old_num_indices;
-   // platform_assert(cfg->fingerprint_size + value_size <= 32);
 
    // for convenience
    uint64 page_size        = cache_config_page_size(cfg->cache_cfg);
@@ -392,74 +351,16 @@ routing_filter_add(cache                  *cc,
    uint64 pages_per_extent = cache_config_pages_per_extent(cfg->cache_cfg);
    uint64 index_size       = cfg->index_size;
 
-   /*
-    * temp and fingerprint_arr are used to radix sort the fps
-    * index_count is # fps in each index
-    */
-
-   //TODO - we should not need a temp buffer here
-    
-   // uint32 *index_count;
-   // uint32 *old_count;
-   // uint32 *matrix;
-   // uint32 *fp_buffer;
-   // uint32 *old_fp_buffer;
-   // uint64 *encoding_buffer;
-   // size_t  temp_buffer_count = num_new_fp +               // temp
-   //                            num_indices +               // index_count
-   //                            index_size +                // old_count
-   //                            MATRIX_ROWS * MATRIX_COLS + // matrix
-   //                            ROUTING_FPS_PER_PAGE +      // fp_buffer
-   //                            ROUTING_FPS_PER_PAGE +      // old_fp_buffer
-   //                            ROUTING_FPS_PER_PAGE / 32;  // encoding_buffer
-   // debug_assert(temp_buffer_count < 100000000);
-   // uint32 *temp =
-   //    TYPED_ARRAY_ZALLOC(PROCESS_PRIVATE_HEAP_ID, temp, temp_buffer_count);
-
-   // if (temp == NULL) {
-   //    return STATUS_NO_MEMORY;
-   // }
-   // index_count     = temp + num_new_fp;
-   // old_count       = index_count + num_indices;
-   // matrix          = old_count + cfg->index_size;
-   // fp_buffer       = matrix + MATRIX_ROWS * MATRIX_COLS;
-   // old_fp_buffer   = fp_buffer + ROUTING_FPS_PER_PAGE;
-   // encoding_buffer = (uint64 *)(old_fp_buffer + ROUTING_FPS_PER_PAGE);
-   // memset(encoding_buffer, 0xff, ROUTING_FPS_PER_PAGE / 32 * sizeof(uint32));
-
-   
-   // // memento filter initialization will break and return the size needed for creation
-   // uint64_t n_bytes = qf_init(NULL, 262144, 18, 5, QF_HASH_DEFAULT, 0xBEEF, NULL, 0);
-   // platform_error_log("memento bytes requested: %lu\n", n_bytes);
-   // platform_error_log("page size: %lu, extent size: %lu\n", page_size, extent_size);
-   
-   // cache_print_stats(stderr, cc);
-
-   // we use a mini_allocator to obtain pages
    allocator      *al = cache_get_allocator(cc);
-   uint64          meta_head; // extent - group of pages
+   uint64          meta_head;
    platform_status rc = allocator_alloc(al, &meta_head, PAGE_TYPE_FILTER);
    platform_assert_status_ok(rc);
    filter->meta_head = meta_head;
-   // filters use an unkeyed mini allocator
    mini_allocator mini;
    mini_init(&mini, cc, NULL, filter->meta_head, 0, 1, PAGE_TYPE_FILTER, FALSE);
    platform_assert(filter->meta_head != old_filter->meta_head);
 
-
-      // set up the index pages
-      // uint64       addrs_per_page = page_size / sizeof(uint64);
-      // page_handle *index_page[MAX_PAGES_PER_EXTENT];
-      // uint64       index_addr = mini_alloc(&mini, 0, NULL_KEY, NULL);  // get
-      // a page from the extent platform_assert(index_addr % extent_size == 0);
-      // index_page[0] = cache_alloc(cc, index_addr, PAGE_TYPE_FILTER); // get a
-      // pointer to the page in memory
-
-      // platform_error_log("before alloc, old_filter->addr = %lu\n",
-      //                    old_filter->addr);
-
    page_handle *pages[N_PAGES * 24];
-   // platform_assert(filter->addr == 0 || old_filter->addr != filter->addr);
 
    uint64_t i = 0;
    if (old_filter->addr != 0) {
@@ -483,30 +384,19 @@ routing_filter_add(cache                  *cc,
             memset(pages[i]->data, 0, 4096);
             continue;
          } else if (i > 0 && i % N_PAGES == 0 && old_index->next_filter == 0) {
-            // cache_unget(cc, old_index_page);
-            // i++;
             break;
          }
 
          next_index_addr = mini_alloc(&mini, 0, NULL_KEY, NULL);
-         
-
          pages[i] = cache_alloc(cc, next_index_addr, PAGE_TYPE_FILTER);
-
-
          cache_assert_ungot(cc, old_index->page_addrs[(i - 1) % N_PAGES]);
 
-         
          page_handle *old_page = cache_get(cc, old_index->page_addrs[(i - 1) % N_PAGES], TRUE, PAGE_TYPE_FILTER);
 
-
          memcpy(pages[i]->data, old_page->data, 4096);
-         
 
          cache_unget(cc, old_page);
-         
       }
-
       cache_unget(cc, old_index_page);
    }
    
@@ -515,250 +405,29 @@ routing_filter_add(cache                  *cc,
       pages[i] = cache_alloc(cc, next_index_addr, PAGE_TYPE_FILTER);
       memset(pages[i]->data, 0, 4096);
    }
-   
-   
-   
    filter->addr = pages[0]->disk_addr;
-   // platform_error_log("filter->addr = %lu old_filter->addr = %lu\n", filter->addr, old_filter->addr);
 
    QF qf;
-   // give up 3 bits for metadata (32 -> 29), need minimum 18 for canonical slot/index -> 11 bits left -> 2 for fingerprint, 9 for memento
-   // ceil(logR) = 9 --> supports range 512
    qf_init_pages(&qf, 1024 * (N_PAGES - 3), 38, MEMENTO_BITS, QF_HASH_NONE, 0xBEEF, pages + (value * N_PAGES), N_PAGES, 2);
-   
    if (value != 0) {
       ((qf_index_page *) pages[(value - 1) * N_PAGES]->data)->next_filter = pages[value * N_PAGES]->disk_addr;
    }
    
    for (i = 0; i < num_new_fp; i++) {
-      // insert singles rather than sort + batch insert // TODO: sort + batch insert
-
       uint32_t memento = new_fp_arr[i] & ((1ULL << MEMENTO_BITS) - 1);
-
       uint32_t fp = new_fp_arr[i] >> MEMENTO_BITS;
-
-      // platform_error_log("filter { fp, memento }: { %u, %u }\n", fp, memento);
-
-      // platform_error_log("add: { fp, memento } = { %lu, %lu }\n", new_fp_arr[i], memento);
       qf_insert_single(&qf, fp, memento, QF_WAIT_FOR_LOCK | QF_KEY_IS_HASH);
-      // platform_error_log("added: {%u, %lu}\n", new_fp_arr[i], memento);
    }
-   
-   
-
-   // platform_error_log("filter->addr: %lu\n", filter->addr);
-
-   // above ^ : we need to copy this functionality
-   
-
-
-   // we write to the filter with the filter cursor
-   // uint64       addr          = mini_alloc(&mini, 0, NULL_KEY, NULL);
-   // page_handle *filter_page   = cache_alloc(cc, addr, PAGE_TYPE_FILTER);
-   // char        *filter_cursor = filter_page->data;
-   // uint64       bytes_remaining_on_page = page_size;
-   //TODO IMPORTANT ^
-
-   // for (uint32 new_fp_no = 0; new_fp_no < num_new_fp; new_fp_no++) {
-   //    new_fp_arr[new_fp_no] >>= 32 - cfg->fingerprint_size;
-   //    new_fp_arr[new_fp_no] <<= value_size;
-   //    new_fp_arr[new_fp_no] |= value;
-   // }
-
-   // uint32 *fp_arr = RadixSort(
-   //    new_fp_arr, matrix, temp, num_new_fp, cfg->fingerprint_size, value_size);
-
-   // uint32 dst_fp_no         = 0;
-   // uint64 num_new_unique_fp = num_new_fp;
-   // for (uint32 src_fp_no = 0; src_fp_no != num_new_fp; src_fp_no++) {
-   //    debug_assert(src_fp_no >= dst_fp_no);
-   //    fp_arr[dst_fp_no] = fp_arr[src_fp_no];
-   //    if (dst_fp_no == 0 || fp_arr[dst_fp_no] != fp_arr[dst_fp_no - 1]) {
-   //       dst_fp_no++;
-   //    } else {
-   //       debug_assert(num_new_unique_fp != 0);
-   //       num_new_unique_fp--;
-   //    }
-   // }
-
-   // uint32 fp_no = 0;
-   // for (uint32 index_no = 0; index_no < num_indices; index_no++) {
-   //    uint64 index_start = fp_no;
-   //    for (; fp_no < num_new_unique_fp
-   //           && routing_get_index(fp_arr[fp_no], index_remainder_and_value_size)
-   //                 == index_no;
-   //         fp_no++)
-   //    {
-   //    }
-   //    index_count[index_no] = fp_no - index_start;
-   // }
-
-   // fp_no = 0;
-   // for (uint32 old_index_no = 0; old_index_no < old_num_indices; old_index_no++)
-   // {
-   //    // process metadata from old filter
-   //    char        *old_block_start;
-   //    uint16       old_index_count = 0;
-   //    page_handle *old_filter_node;
-   //    if (old_filter->addr != 0) {
-   //       routing_hdr *old_hdr = routing_get_header(
-   //          cc, cfg, old_filter->addr, old_index_no, &old_filter_node);
-   //       uint16 header_length = routing_header_length(cfg, old_hdr);
-   //       old_block_start      = (char *)old_hdr + header_length;
-   //       old_index_count      = old_hdr->num_remainders;
-   //       routing_get_bucket_counts(cfg, old_hdr, old_count);
-   //       // routing_filter_print_encoding(cfg, old_hdr);
-   //    }
-
-   //    uint32 *old_src_fp         = old_fp_buffer;
-   //    uint32 *dst_fp             = fp_buffer;
-   //    uint32  index_bucket_start = old_index_no * index_size;
-   //    if (old_index_count != 0) {
-   //       platform_assert(old_index_count <= ROUTING_FPS_PER_PAGE);
-   //       PackedArray_unpack((uint32 *)old_block_start,
-   //                          0,
-   //                          old_src_fp,
-   //                          old_index_count,
-   //                          old_remainder_and_value_size);
-   //       uint32 old_fp_no = 0;
-   //       for (uint32 bucket_off = 0; bucket_off < index_size; bucket_off++) {
-   //          uint32 bucket = index_bucket_start + bucket_off;
-   //          for (uint32 i = 0; i < old_count[bucket_off]; i++) {
-   //             old_src_fp[old_fp_no++] |= bucket
-   //                                        << old_remainder_and_value_size;
-   //          }
-   //       }
-   //       debug_assert((old_fp_no == old_index_count),
-   //                    "old_fp_no=%u, old_index_count=%u\n",
-   //                    old_fp_no,
-   //                    old_index_count);
-
-   //       if (old_value_size != value_size) {
-   //          for (old_fp_no = 0; old_fp_no < old_index_count; old_fp_no++) {
-   //             uint32 old_value = old_src_fp[old_fp_no] & old_value_mask;
-   //             old_src_fp[old_fp_no] -= old_value;
-   //             old_src_fp[old_fp_no] <<= (value_size - old_value_size);
-   //             old_src_fp[old_fp_no] |= old_value;
-   //          }
-   //       }
-   //    }
-   //    uint32 old_fps_added = 0;
-   //    for (uint32 index_off = 0; index_off < new_indices_per_old_index;
-   //         index_off++)
-   //    {
-   //       uint32 *new_src_fp = &fp_arr[fp_no];
-   //       uint32 index_no = old_index_no * new_indices_per_old_index + index_off;
-   //       uint32 last_bucket = index_no * index_size;
-   //       uint32 fps_added = 0, new_fps_added = 0;
-   //       uint32 end_bucket      = (index_no + 1) * index_size;
-   //       uint32 new_index_count = index_count[index_no];
-   //       uint64 header_bit      = 0;
-   //       // platform_default_log("index 0x%x start 0x%x end 0x%x\n", index_no,
-   //       // last_bucket, end_bucket);
-   //       uint32 last_fp_added = UINT32_MAX;
-   //       while (new_fps_added < new_index_count
-   //              || old_fps_added < old_index_count)
-   //       {
-   //          uint32 fp;
-   //          bool32 is_old = ((new_fps_added == new_index_count)
-   //                           || ((old_fps_added != old_index_count)
-   //                               && (old_src_fp[old_fps_added]
-   //                                   <= new_src_fp[new_fps_added])));
-   //          if (is_old) {
-   //             fp = old_src_fp[old_fps_added++];
-   //          } else {
-   //             fp = new_src_fp[new_fps_added++];
-   //          }
-   //          if (last_fp_added >> value_size != fp >> value_size) {
-   //             filter->num_unique++;
-   //          }
-   //          uint32 bucket = routing_get_bucket(fp, remainder_and_value_size);
-   //          // if (fp >> value_size == 0x4a11feb) {
-   //          //    if (is_old) {
-   //          //       platform_default_log("old %4u 0x%08x bucket 0x%x\n",
-   //          //       old_fps_added, fp, bucket);
-   //          //    } else {
-   //          //       platform_default_log("new %4u 0x%08x bucket 0x%x\n",
-   //          //       new_fps_added, fp, bucket);
-   //          //    }
-   //          // }
-   //          if (bucket >= end_bucket) {
-   //             debug_assert(is_old);
-   //             debug_assert(old_fps_added != 0);
-   //             old_fps_added--;
-   //             break;
-   //          }
-   //          debug_assert(bucket >= last_bucket);
-   //          header_bit += bucket - last_bucket;
-   //          last_bucket = bucket;
-   //          routing_unset_bit(encoding_buffer, header_bit++);
-   //          last_fp_added       = fp;
-   //          dst_fp[fps_added++] = fp & remainder_and_value_mask;
-   //       }
-
-   //       uint32 remainder_block_size =
-   //          (fps_added * remainder_and_value_size - 1) / 8 + 4; //   /8 - bits to bytes; +4 - metadata padding
-   //       uint64 encoding_size = (fps_added + index_size - 1) / 8 + 4;
-   //       uint32 header_size   = encoding_size + sizeof(routing_hdr);
-   //       if (header_size + remainder_block_size > bytes_remaining_on_page) {
-   //          routing_unlock_and_unget_page(cc, filter_page);
-   //          addr        = mini_alloc(&mini, 0, NULL_KEY, NULL);
-   //          filter_page = cache_alloc(cc, addr, PAGE_TYPE_FILTER);
-
-   //          bytes_remaining_on_page = page_size;
-   //          filter_cursor           = filter_page->data;
-   //       }
-
-   //       // Set the index_no
-   //       // ALEX: for now the indices must fit in a single extent
-   //       debug_assert(index_no / addrs_per_page < pages_per_extent);
-   //       uint64  index_page_no = index_no / addrs_per_page;
-   //       uint64  index_offset  = index_no % addrs_per_page;
-   //       uint64 *index_cursor  = (uint64 *)(index_page[index_page_no]->data);
-   //       index_cursor += index_offset;
-   //       uint64 filter_page_offset = filter_cursor - filter_page->data;
-   //       *index_cursor             = addr + filter_page_offset;
-
-   //       routing_hdr *hdr    = (routing_hdr *)filter_cursor;
-   //       hdr->num_remainders = fps_added;
-   //       memmove(hdr->encoding, encoding_buffer, encoding_size);
-   //       memset(encoding_buffer, 0xff, encoding_size);
-   //       filter_cursor += header_size;
-   //       if (fps_added != 0) {
-   //          PackedArray_pack((uint32 *)filter_cursor,
-   //                           0,
-   //                           fp_buffer,
-   //                           fps_added,
-   //                           remainder_and_value_size);
-   //       }
-   //       fp_no += index_count[index_no];
-   //       filter_cursor += remainder_block_size;
-   //       debug_assert(bytes_remaining_on_page
-   //                    >= header_size + remainder_block_size);
-   //       bytes_remaining_on_page -= header_size + remainder_block_size;
-   //    }
-   //    if (old_filter->addr != 0) {
-   //       routing_unget_header(cc, old_filter_node);
-   //    }
-   // }
-   // debug_assert(fp_no == num_new_unique_fp);
-
-   //IMPORTANT: probably still need this V
-   // routing_unlock_and_unget_page(cc, filter_page);
 
    for (i = 0; i < N_PAGES * 24; i++) {
       routing_unlock_and_unget_page(cc, pages[i]);
    }
 
-   mini_release(&mini, NULL_KEY);
-
-   // platform_free(PROCESS_PRIVATE_HEAP_ID, temp);
-   
+   mini_release(&mini, NULL_KEY);   
 
    return STATUS_OK;
 }
 
-//TODO: Make this actually work
 void
 routing_filter_prefetch(cache          *cc,
                         routing_config *cfg,
@@ -810,8 +479,6 @@ routing_filter_estimate_unique_fp(cache           *cc,
                                   routing_filter  *filter,
                                   uint64           num_filters)
 {
-   // TODO: bad (i.e. digshot)
-
    if (filter->addr == 0) {
       return 0;
    }
@@ -1032,17 +699,10 @@ routing_filter_lookup(cache          *cc,
 
    for (uint16_t val = 0; val < n_filters; val++) {
       QF qf;
-
       qf_use_pages(&qf, pages + (N_PAGES * val));
-
-      // TODO: LOCK
-      // platform_error_log("query: { fp, memento } = { %lu, %lu }\n", fp, memento);
       int found = qf_point_query(&qf, fp, memento, QF_WAIT_FOR_LOCK | QF_KEY_IS_HASH);
-
-      //possibly reverse this
-      if (found != 0) { // **ISSUE: found == 0
+      if (found != 0) {
          found_values_int |= (1UL << val);
-         // found_values_int |= (1UL << (n_filters - 1 - val));
       }
    }
 
@@ -1188,18 +848,10 @@ routing_filter_lookup_range(cache          *cc,
 
    for (uint16_t val = 0; val < n_filters; val++) {
       QF qf;
-
       qf_use_pages(&qf, pages + (N_PAGES * val));
-
-      // TODO: LOCK
-      // platform_error_log("query: { fp, memento } = { %lu, %lu }\n", fp, memento);
-      // int found = qf_point_query(&qf, fp, memento, QF_WAIT_FOR_LOCK | QF_KEY_IS_HASH);
       int found = qf_range_query(&qf, min_fp, min_memento, max_fp, max_memento, QF_WAIT_FOR_LOCK | QF_KEY_IS_HASH);
-
-      //possibly reverse this
-      if (found != 0) { // **ISSUE: found == 0
+      if (found != 0) {
          found_values_int |= (1UL << val);
-         // found_values_int |= (1UL << (n_filters - 1 - val));
       }
    }
 

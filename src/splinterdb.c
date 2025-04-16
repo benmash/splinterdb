@@ -112,8 +112,7 @@ splinterdb_config_set_defaults(splinterdb_config *cfg)
       cfg->reclaim_threshold = UINT64_MAX;
    }
 
-   //TODO: erase
-   cfg->use_stats = true;
+   cfg->use_stats = false;
 }
 
 static platform_status
