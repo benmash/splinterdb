@@ -111,8 +111,6 @@ splinterdb_config_set_defaults(splinterdb_config *cfg)
    if (!cfg->reclaim_threshold) {
       cfg->reclaim_threshold = UINT64_MAX;
    }
-
-   cfg->use_stats = false;
 }
 
 static platform_status
@@ -668,22 +666,10 @@ splinterdb_range_query(const splinterdb     *kvs,        // IN
                        slice                 end_key     // IN
 )
 {
-   // splinterdb_iterator *it = TYPED_MALLOC(kvs->spl->heap_id, it);
-   // if (it == NULL) {
-   //    platform_error_log("TYPED_MALLOC error\n");
-   //    return platform_status_to_int(STATUS_NO_MEMORY);
-   // }
-   // it->last_rc = STATUS_OK;
-
-   // trunk_range_iterator *range_itor = &(it->sri);
-
    splinterdb_lookup_result r;
    splinterdb_lookup_result_init(kvs, &r, 0, NULL);
    _splinterdb_lookup_result *_r     = (_splinterdb_lookup_result *) &r;
    merge_accumulator         *result = &_r->value;
-
-
-   // platform_error_log("range_range\n");
    
    bool32 nonempty_range = do_range_query(kvs->spl, key_create_from_slice(start_key), key_create_from_slice(end_key), result);
 

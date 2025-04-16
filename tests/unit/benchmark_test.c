@@ -257,16 +257,10 @@ CTEST2(benchmark, range_query_stress_test) {
 
     printf("\ninserts done\n");
 
-    // trunk_print(stderr, splinterdb_get_trunk_handle(data->kvsb));
-
     timestamp ts = platform_get_timestamp();
 
     uint64 nonempty_ranges = 0;
     for (uint64 i = 0; i < N_RANGES; i++){
-        // if (range_counts[i]) nonempty_ranges++;
-
-        // printf("[%lu - %lu]\n", range_starts[i], range_starts[i] + range_width);
-
         uint64 start = htobe64(range_starts[i]);
 
         slice start_key = slice_create(sizeof(uint64), &start);
@@ -285,8 +279,6 @@ CTEST2(benchmark, range_query_stress_test) {
 
         if (range_counts[i]) {
             nonempty_ranges++;
-            // printf("found key: %lu\n\n", be64toh(*(uint64 *)slice_data(found_key)));
-
             uint64 k = be64toh(*(uint64 *)slice_data(found_key));
 
             ASSERT_TRUE(range_starts[i] <= k);

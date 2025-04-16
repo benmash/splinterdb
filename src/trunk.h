@@ -365,15 +365,6 @@ trunk_range_iterator_init(trunk_handle         *spl,
                           comparison            start_type,
                           uint64                num_tuples);
 
-platform_status
-trunk_range_range_filter_iterator_init(trunk_handle         *spl,
-                                       trunk_range_iterator *range_itor,
-                                       key                   min_key,
-                                       key                   max_key,
-                                       key                   start_key,
-                                       comparison            start_type,
-                                       uint64                num_tuples);
-
 void
 trunk_range_iterator_deinit(trunk_range_iterator *range_itor);
 

@@ -14,8 +14,7 @@
 #include "io.h"
 
 // #define ADDR_TRACING
-// #define TRACE_ADDR  (UINT64_MAX - 1)
-#define TRACE_ADDR (86507520ULL)
+#define TRACE_ADDR  (UINT64_MAX - 1)
 #define TRACE_ENTRY (UINT32_MAX - 1)
 
 // #define RECORD_ACQUISITION_STACKS

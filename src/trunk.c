@@ -6979,12 +6979,8 @@ key_to_int(key k)
 bool32
 entry_scan(trunk_handle *spl, key start_key, key end_key, merge_accumulator *result)
 {
-   // platform_error_log("scanning memtable\n");
-
    merge_accumulator_set_to_null(result);
-
    memtable_begin_lookup(spl->mt_ctxt);
-   // bool32 found_in_memtable = FALSE;
    uint64 mt_gen_start      = memtable_generation(spl->mt_ctxt);
    uint64 mt_gen_end        = memtable_generation_retired(spl->mt_ctxt);
    platform_assert(mt_gen_start - mt_gen_end <= TRUNK_NUM_MEMTABLES);
@@ -7034,49 +7030,11 @@ entry_scan(trunk_handle *spl, key start_key, key end_key, merge_accumulator *res
 bool32
 traverse_trunk(trunk_handle *spl, trunk_node *node, key start, key end)
 {
-   // platform_error_log("dfsing the trunk [%lu]\n", node->page->disk_addr);
-   // trunk_print_node(stderr, spl, node->addr);
-   // trunk_print_subtree(stderr, spl, spl->root_addr);
-   // trunk_print(stderr, spl);
-
    bool32 good_tree = trunk_verify_tree(spl);
 
    routing_config *cfg = &spl->cfg.filter_cfg;
 
    uint64_t any_found_in_trunk = 0;
-
-   // uint16 poop = trunk_start_sb_filter(spl, node);
-   // platform_error_log("i: %u\n", poop);
-   // platform_error_log("cond: %u\n", trunk_end_sb_filter(spl, node));
-
-   // uint64_t found_values;
-   // platform_status r = routing_filter_lookup_range(spl->cc, cfg, node->hdr->sb_filter, start, end, &found_values);
-   // platform_error_log("found_values: %lu\n", found_values);
-/*
-   for (uint16 sb_filter_no = trunk_start_sb_filter(spl, node);
-        sb_filter_no != trunk_end_sb_filter(spl, node);
-        sb_filter_no = trunk_add_subbundle_filter_number(spl, sb_filter_no, 1))
-   {
-   // for (uint sb_filter_no = 0; sb_filter_no < node->hdr->end_subbundle; sb_filter_no++) {
-      routing_filter *sb_filter = trunk_get_sb_filter(spl, node, sb_filter_no);
-      
-      // platform_error_log("valid filter: %u [%u]\n", sb_filter_no, trunk_sb_filter_valid(spl, node, sb_filter_no)); 
-
-      uint64_t found_values;
-      routing_filter_lookup_range(spl->cc, cfg, sb_filter, start, end, &found_values);
-      // platform_error_log("found_values: %lu\n", found_values);
-
-      any_found_in_trunk |= found_values;
-   }
-
-   if (any_found_in_trunk != 0) {
-      return TRUE;
-   }
-      */
-
-   // if (trunk_node_is_leaf(node)) {
-   //    return FALSE;
-   // }
 
    uint16 pivot_no_start = trunk_find_pivot(spl, node, start, less_than_or_equal);
    uint16 pivot_no_end = trunk_find_pivot(spl, node, end, greater_than_or_equal);
@@ -9926,8 +9884,6 @@ trunk_config_init(trunk_config        *trunk_cfg,
       * cache_config_extent_size(cache_cfg) / MEMTABLE_SPACE_OVERHEAD_FACTOR;
    trunk_cfg->target_leaf_kv_bytes = trunk_cfg->max_kv_bytes_per_node / 2;
    trunk_cfg->max_tuples_per_node  = trunk_cfg->max_kv_bytes_per_node / 32;
-   // platform_error_log("\nmax_tuples_per_node: %lu\n", trunk_cfg->max_tuples_per_node);
-   // platform_error_log("\nmemtable capacity: %lu\n", memtable_capacity);
 
    // filter config settings
    filter_cfg->cache_cfg = cache_cfg;

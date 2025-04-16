@@ -1,7 +1,7 @@
 /*
- * routing_filter_memento.h --
+ * routing_filter.h --
  *
- *     This file contains the routing_filter interface addapted to use an array of Memento filters.
+ *     This file contains the routing_filter interface adapted to use an array of Memento filters.
  */
 
  #pragma once
