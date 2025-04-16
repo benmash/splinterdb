@@ -1162,9 +1162,62 @@ CTEST2(splinterdb_quick, test_range_query_in_tree)
    splinterdb_iterator_deinit(iter);
 }
 
-CTEST2(splinterdb_quick, test_range_query_empty_range_perf)
+CTEST2(splinterdb_quick, test_range_query_empty_range_perf_original)
 {
-   const int num_inserts = 10000;
+   const int num_inserts = 100;
+   const int min_key     = 1;
+
+   for (uint64_t inc = 4; inc < 2000000; inc *= 2) {
+      // Setup new SplinterDB instance
+      default_data_config_init(TEST_MAX_KEY_SIZE,
+                               &data->default_data_cfg.super);
+      create_default_cfg(&data->cfg, &data->default_data_cfg.super);
+      data->cfg.use_shmem =
+         config_parse_use_shmem(Ctest_argc, (char **)Ctest_argv);
+
+      int rc = splinterdb_create(&data->cfg, &data->kvsb);
+      ASSERT_EQUAL(0, rc);
+      ASSERT_TRUE(TEST_MAX_VALUE_SIZE
+                  < MAX_INLINE_MESSAGE_SIZE(LAIO_DEFAULT_PAGE_SIZE));
+
+      // Insert keys
+      rc = insert_keys(data->kvsb, min_key, num_inserts, inc);
+      ASSERT_EQUAL(0, rc);
+
+      // Close and re-open the database to flush
+      splinterdb_close(&data->kvsb);
+      rc = splinterdb_open(&data->cfg, &data->kvsb);
+      ASSERT_EQUAL(0, rc);
+
+      timestamp ts = platform_get_timestamp();
+      for (uint64_t j = min_key + 1; j < (uint64_t)(inc * (num_inserts - 1));
+           j += inc)
+      {
+         // Set up the range query from key j to j + inc - 1.
+         uint64_t start_val = htobe64(j);
+         // uint64_t end_val   = htobe64(j + inc - 1);
+         slice start_key = slice_create(sizeof(uint64_t), &start_val);
+         // slice    end_key   = slice_create(sizeof(uint64_t), &end_val);
+         // Run range query
+         splinterdb_iterator *iter = NULL;
+         rc = splinterdb_iterator_init(data->kvsb, &iter, start_key);
+         ASSERT_EQUAL(0, rc);
+         // Verify that the iterator starts at end_val, indicating empty range
+         rc = check_current_tuple(iter, j + inc - 1);
+         ASSERT_EQUAL(0, rc);
+         splinterdb_iterator_deinit(iter);
+      }
+      printf("Spent (%lu s) on range queries of size %lu.\n",
+             NSEC_TO_MSEC(platform_timestamp_elapsed(ts)),
+             inc - 1);
+      // Close the database
+      splinterdb_close(&data->kvsb);
+   }
+}
+
+CTEST2(splinterdb_quick, test_range_query_empty_range_perf_memento)
+{
+   const int num_inserts = 100;
    const int min_key     = 1;
 
    for(uint64_t inc = 4; inc < 2000000; inc *= 2) {
@@ -1212,4 +1265,3 @@ CTEST2(splinterdb_quick, test_range_query_empty_range_perf)
       splinterdb_close(&data->kvsb);
    }
 }
-

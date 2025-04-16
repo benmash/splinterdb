@@ -655,22 +655,13 @@ routing_filter_lookup(cache          *cc,
       return STATUS_OK;
    }
 
-   // platform_error_log("lookup filter->addr = %lu\n", filter->addr);
-
    hash_fn   hash       = cfg->hash;
    uint64_t  seed       = cfg->seed;
    uint64_t  index_size = cfg->index_size;
    uint64_t  page_size  = cache_config_page_size(cfg->cache_cfg);
 
    uint32_t fp = hash(key_data(target), key_length(target), seed) << MEMENTO_BITS;
-   
    fp >>= MEMENTO_BITS;
-
-   // platform_error_log("query fp before: %lu\n", fp);
-   // fp >>= 32 - cfg->fingerprint_size;
-   // platform_error_log("fp after shift: %lu\n", fp);
-   // uint32_t memento = fp & ((1ULL << 9) - 1);
-
    uint32 memento = be64toh(*(uint64_t *)key_data(target)) & ((1UL << MEMENTO_BITS) - 1);
 
    uint64_t found_values_int = 0;
@@ -712,68 +703,6 @@ routing_filter_lookup(cache          *cc,
 
    *found_values = found_values_int;
    return STATUS_OK;
-
-   // size_t value_size      = filter->value_size;
-   // uint32 log_num_buckets = 31 - __builtin_clz(filter->num_fingerprints);
-   // if (log_num_buckets < cfg->log_index_size) {
-   //    log_num_buckets = cfg->log_index_size;
-   // }
-   // uint32 remainder_size           = cfg->fingerprint_size - log_num_buckets;
-   // size_t remainder_and_value_size = remainder_size + value_size;
-   
-   // uint32 bucket =
-   //    routing_get_bucket(fp << value_size, remainder_and_value_size);
-   // uint32 bucket_off = bucket % index_size;
-   // size_t index_remainder_and_value_size =
-   //    remainder_size + value_size + cfg->log_index_size;
-   // uint32 remainder_mask = (1UL << remainder_size) - 1;
-   // uint32 index =
-   //    routing_get_index(fp << value_size, index_remainder_and_value_size);
-   // uint32 remainder = fp & remainder_mask;
-
-   // page_handle *filter_node;
-   // routing_hdr *hdr =
-   //    routing_get_header(cc, cfg, filter->addr, index, &filter_node);
-   // uint64 encoding_size = (hdr->num_remainders + index_size - 1) / 8 + 4;
-   // uint64 header_length = encoding_size + sizeof(routing_hdr);
-
-   // uint64 start, end;
-   // routing_get_bucket_bounds(
-   //    hdr->encoding, header_length, bucket_off, &start, &end);
-   // char *remainder_block_start = (char *)hdr + header_length;
-
-   // // platform_default_log("routing_filter_lookup: "
-   // //      "index 0x%lx bucket 0x%lx (0x%lx) remainder 0x%x start %lu end
-   // //      %lu\n", index, bucket, bucket % index_size, remainder, start, end);
-
-   // if (start == end) {
-   //    routing_unget_header(cc, filter_node);
-   //    *found_values = 0;
-   //    return STATUS_OK;
-   // }
-
-   // uint64 found_values_int = 0;
-   // for (uint32 i = 0; i < end - start; i++) {
-   //    uint32 pos = end - i - 1;
-   //    uint32 found_remainder_and_value;
-   //    routing_filter_get_remainder_and_value(cfg,
-   //                                           (uint32 *)remainder_block_start,
-   //                                           pos,
-   //                                           &found_remainder_and_value,
-   //                                           remainder_and_value_size);
-   //    uint32 found_remainder = found_remainder_and_value >> value_size;
-   //    if (found_remainder == remainder) {
-   //       uint32 value_mask  = (1UL << value_size) - 1;
-   //       uint16 found_value = found_remainder_and_value & value_mask;
-   //       platform_assert(found_value < 64);
-   //       found_values_int |= (1UL << found_value);
-   //    }
-   // }
-
-   // routing_unget_header(cc, filter_node);
-   // *found_values = found_values_int;
-   // return STATUS_OK;
-   
 }
 
 
@@ -804,8 +733,6 @@ routing_filter_lookup_range(cache          *cc,
       return STATUS_OK;
    }
 
-   // platform_error_log("lookup filter->addr = %lu\n", filter->addr);
-
    hash_fn   hash       = cfg->hash;
    uint64_t  seed       = cfg->seed;
    uint64_t  index_size = cfg->index_size;
@@ -817,9 +744,6 @@ routing_filter_lookup_range(cache          *cc,
    min_fp >>= MEMENTO_BITS;
    max_fp >>= MEMENTO_BITS;
 
-   // platform_error_log("query fp before: %lu\n", fp);
-   // fp >>= 32 - cfg->fingerprint_size;
-   // platform_error_log("fp after shift: %lu\n", fp);
    uint32_t min_memento = be64toh(*(uint64_t *)key_data(min)) & ((1ULL << MEMENTO_BITS) - 1);
    uint32_t max_memento = be64toh(*(uint64_t *)key_data(max)) & ((1ULL << MEMENTO_BITS) - 1);
    uint64_t found_values_int = 0;

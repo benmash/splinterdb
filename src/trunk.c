@@ -6295,10 +6295,6 @@ trunk_range_iterator_init(trunk_handle         *spl,
    key_buffer_init_from_key(
       &range_itor->local_max_key, spl->heap_id, local_max);
 
-      
-   // ** interception point
-
-
    trunk_node_unget(spl->cc, &node);
 
    for (uint64 i = 0; i < range_itor->num_branches; i++) {
@@ -7056,7 +7052,7 @@ traverse_trunk(trunk_handle *spl, trunk_node *node, key start, key end)
    // uint64_t found_values;
    // platform_status r = routing_filter_lookup_range(spl->cc, cfg, node->hdr->sb_filter, start, end, &found_values);
    // platform_error_log("found_values: %lu\n", found_values);
-
+/*
    for (uint16 sb_filter_no = trunk_start_sb_filter(spl, node);
         sb_filter_no != trunk_end_sb_filter(spl, node);
         sb_filter_no = trunk_add_subbundle_filter_number(spl, sb_filter_no, 1))
@@ -7076,6 +7072,7 @@ traverse_trunk(trunk_handle *spl, trunk_node *node, key start, key end)
    if (any_found_in_trunk != 0) {
       return TRUE;
    }
+      */
 
    // if (trunk_node_is_leaf(node)) {
    //    return FALSE;
@@ -7095,10 +7092,15 @@ traverse_trunk(trunk_handle *spl, trunk_node *node, key start, key end)
          return TRUE;
       }
 
+   }
+
+   for (uint16 pivot_no = pivot_no_start; pivot_no < pivot_no_end; pivot_no++) {
+      trunk_pivot_data *pdata = trunk_get_pivot_data(spl, node, pivot_no);
+
       if (pdata->addr == 0) {
          return FALSE;
       }
-
+      
       trunk_node child;
       trunk_node_get(spl->cc, pdata->addr, &child);
 

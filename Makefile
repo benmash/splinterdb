@@ -120,6 +120,9 @@ ifeq "$(BUILD_MODE)" "debug"
 else ifeq "$(BUILD_MODE)" "release"
    CFLAGS    += -Ofast -flto
    LDFLAGS   += -Ofast -flto
+else ifeq "$(BUILD_MODE)" "release-p"
+   CFLAGS    += -Ofast -flto -pg
+   LDFLAGS   += -Ofast -flto
 else ifeq "$(BUILD_MODE)" "optimized-debug"
    CFLAGS    += -DSPLINTER_DEBUG
    CFLAGS    += -Ofast -flto
